@@ -7,6 +7,7 @@ package org.geoserver.configuration.core.main;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.geoserver.configuration.core.security.oidc.OidcSecurityConfiguration;
 import org.geoserver.security.GeoServerSecurityManager;
 import org.geoserver.spring.config.annotations.TranspileXmlConfig;
 import org.springframework.context.annotation.Configuration;
@@ -23,7 +24,7 @@ import org.springframework.context.annotation.Import;
 @TranspileXmlConfig(
         locations = "jar:gs-main-.*!/applicationSecurityContext.xml",
         excludes = {"authenticationManager", "disabledFilter"})
-@Import(GeoServerMainSecurityConfiguration_Generated.class)
+@Import({GeoServerMainSecurityConfiguration_Generated.class, OidcSecurityConfiguration.class})
 @Slf4j(topic = "org.geoserver.cloud.autoconfigure.security")
 public class GeoServerMainSecurityConfiguration {
 

@@ -44,9 +44,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.jwt.BadJwtException;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
+import org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionAuthenticatedPrincipal;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -63,8 +64,7 @@ import org.springframework.test.context.DynamicPropertySource;
         properties = {
             "geoserver.security.gateway-shared-auth.enabled=true",
             "geoserver.extension.security.gateway-bearer-auth.enabled=true",
-            "geoserver.extension.security.gateway-bearer-auth.issuer-uri=https://issuer.example.test",
-            "geoserver.extension.security.gateway-bearer-auth.audience=geoserver-cloud-test",
+            "geoserver.extension.security.gateway-bearer-auth.introspection-uri=https://issuer.example.test/introspect",
             "geoserver.extension.security.gateway-bearer-auth.role-mappings.test-reader=PRIVATE_READER",
             "logging.level.org.geoserver.cloud.security.gateway.sharedauth=trace"
         })
@@ -72,7 +72,7 @@ import org.springframework.test.context.DynamicPropertySource;
 @AutoConfigureTestRestTemplate
 @WireMockTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@Import(GatewaySharedAuthTest.TestJwtDecoderConfiguration.class)
+@Import(GatewaySharedAuthTest.TestOpaqueTokenIntrospectorConfiguration.class)
 class GatewaySharedAuthTest {
     // stub mappings in JSON format, see https://wiremock.org/docs/stubbing/
 
@@ -166,24 +166,25 @@ class GatewaySharedAuthTest {
     private static WireMockRuntimeInfo wmRuntimeInfo;
 
     @TestConfiguration(proxyBeanMethods = false)
-    static class TestJwtDecoderConfiguration {
+    static class TestOpaqueTokenIntrospectorConfiguration {
 
         @Bean
         @Primary
-        JwtDecoder testJwtDecoder() {
+        OpaqueTokenIntrospector testOpaqueTokenIntrospector() {
             return token -> {
                 if (!"valid-test-token".equals(token)) {
-                    throw new BadJwtException("Invalid test token");
+                    throw new InvalidBearerTokenException("Invalid test token");
                 }
-                return Jwt.withTokenValue(token)
-                        .header("alg", "RS256")
-                        .claim("iss", "https://issuer.example.test")
-                        .claim("aud", List.of("geoserver-cloud-test"))
-                        .claim("preferred_username", "bearer-user")
-                        .claim(
-                                "resource_access",
-                                Map.of("gs-client", Map.of("roles", List.of("test-reader", "unmapped-role"))))
-                        .build();
+                return new OAuth2IntrospectionAuthenticatedPrincipal(
+                        "bearer-user",
+                        Map.of(
+                                "active",
+                                true,
+                                "preferred_username",
+                                "bearer-user",
+                                "roles",
+                                List.of("test-reader", "unmapped-role")),
+                        List.of(new SimpleGrantedAuthority("ROLE_PRIVATE_READER")));
             };
         }
     }

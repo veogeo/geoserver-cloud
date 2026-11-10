@@ -7,6 +7,7 @@ package org.geoserver.configuration.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import org.geoserver.configuration.core.main.GeoServerMainSecurityConfiguration;
 import org.geoserver.configuration.core.security.oidc.OidcSecurityConfiguration;
 import org.geoserver.configuration.core.web.sec.WebSecCoreConfiguration;
 import org.geoserver.security.GeoServerSecurityManager;
@@ -15,6 +16,7 @@ import org.geoserver.security.oauth2.spring.GeoServerOidcIdTokenDecoderFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.annotation.UserConfigurations;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
+import org.springframework.context.annotation.Import;
 
 class OidcSecurityConfigurationTest {
 
@@ -31,5 +33,13 @@ class OidcSecurityConfigurationTest {
                 .hasSingleBean(GeoServerOidcIdTokenDecoderFactory.class)
                 .hasBean("oidcHttpSecurityConfiguration")
                 .hasBean("openIdConnectAuthPanelInfo"));
+    }
+
+    @Test
+    void commonSecurityConfigurationImportsOidcProviderForEveryService() {
+        assertThat(GeoServerMainSecurityConfiguration.class
+                        .getAnnotation(Import.class)
+                        .value())
+                .contains(OidcSecurityConfiguration.class);
     }
 }

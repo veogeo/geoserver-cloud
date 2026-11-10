@@ -33,4 +33,14 @@ class GatewayBearerAuthAutoConfigurationTest {
                     assertThat(context).doesNotHaveBean(GatewayBearerAuthAutoConfiguration.class);
                 });
     }
+
+    @Test
+    void jwtDecoderIsSkippedWhenOpaqueIntrospectionIsConfigured() {
+        assertThat(GatewayBearerAuthJwtDecoderCondition.shouldCreateJwtDecoder("http://geonode/api/o/v4/tokeninfo/"))
+                .isFalse();
+        assertThat(GatewayBearerAuthJwtDecoderCondition.shouldCreateJwtDecoder(null))
+                .isTrue();
+        assertThat(GatewayBearerAuthJwtDecoderCondition.shouldCreateJwtDecoder("  "))
+                .isTrue();
+    }
 }

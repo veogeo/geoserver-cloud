@@ -23,7 +23,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.authentication.AbstractOAuth2TokenAuthenticationToken;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 import org.springframework.web.servlet.function.HandlerFilterFunction;
@@ -67,7 +67,7 @@ class GatewaySharedAuth implements HandlerFilterFunction<ServerResponse, ServerR
 
         // PRE: strip incoming x-gsc-* headers (prevent impersonation),
         //      inject session-stored credentials for downstream
-        JwtAuthenticationToken bearerAuthentication = currentBearerAuthentication();
+        AbstractOAuth2TokenAuthenticationToken<?> bearerAuthentication = currentBearerAuthentication();
         ServerRequest modifiedRequest = preProcess(request, bearerAuthentication);
 
         // Proxy exchange
@@ -93,7 +93,7 @@ class GatewaySharedAuth implements HandlerFilterFunction<ServerResponse, ServerR
      * services.
      */
     private static ServerRequest preProcess(
-            ServerRequest request, @Nullable JwtAuthenticationToken bearerAuthentication) {
+            ServerRequest request, @Nullable AbstractOAuth2TokenAuthenticationToken<?> bearerAuthentication) {
         HttpServletRequest servletRequest = request.servletRequest();
         logImpersonationAttempt(servletRequest);
 
@@ -167,9 +167,11 @@ class GatewaySharedAuth implements HandlerFilterFunction<ServerResponse, ServerR
     }
 
     @Nullable
-    private static JwtAuthenticationToken currentBearerAuthentication() {
+    private static AbstractOAuth2TokenAuthenticationToken<?> currentBearerAuthentication() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication instanceof JwtAuthenticationToken jwt && jwt.isAuthenticated() ? jwt : null;
+        return authentication instanceof AbstractOAuth2TokenAuthenticationToken<?> bearer && bearer.isAuthenticated()
+                ? bearer
+                : null;
     }
 
     private static void loggedIn(HttpServletRequest request, @NonNull String user, List<String> roles) {

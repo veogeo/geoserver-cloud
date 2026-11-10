@@ -11,8 +11,10 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -29,9 +31,11 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 /** Validates OIDC Bearer JWTs once at the gateway and provides the authenticated identity to SharedAuth. */
 @AutoConfiguration
@@ -42,14 +46,25 @@ public class GatewayBearerAuthAutoConfiguration {
     @Bean
     @Order(1)
     SecurityFilterChain bearerTokenSecurityFilterChain(
-            HttpSecurity http, JwtAuthenticationConverter bearerJwtAuthenticationConverter) throws Exception {
+            HttpSecurity http,
+            JwtAuthenticationConverter bearerJwtAuthenticationConverter,
+            GatewayBearerAuthConfigProperties properties,
+            org.springframework.beans.factory.ObjectProvider<OpaqueTokenIntrospector> introspectorProvider)
+            throws Exception {
         http.securityMatcher(bearerTokenRequestMatcher())
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
-                .oauth2ResourceServer(resourceServer ->
-                        resourceServer.jwt(jwt -> jwt.jwtAuthenticationConverter(bearerJwtAuthenticationConverter)));
+                .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated());
+        if (StringUtils.hasText(properties.getIntrospectionUri())) {
+            OpaqueTokenIntrospector introspector = introspectorProvider.getIfAvailable();
+            Assert.notNull(introspector, "Opaque token introspection is configured but no introspector is available");
+            http.oauth2ResourceServer(
+                    resourceServer -> resourceServer.opaqueToken(opaque -> opaque.introspector(introspector)));
+        } else {
+            http.oauth2ResourceServer(resourceServer ->
+                    resourceServer.jwt(jwt -> jwt.jwtAuthenticationConverter(bearerJwtAuthenticationConverter)));
+        }
         return http.build();
     }
 
@@ -63,6 +78,7 @@ public class GatewayBearerAuthAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(JwtDecoder.class)
+    @Conditional(GatewayBearerAuthJwtDecoderCondition.class)
     JwtDecoder bearerJwtDecoder(GatewayBearerAuthConfigProperties properties) {
         Assert.hasText(properties.getIssuerUri(), GatewayBearerAuthConfigProperties.PREFIX + ".issuer-uri is required");
         Assert.hasText(properties.getAudience(), GatewayBearerAuthConfigProperties.PREFIX + ".audience is required");
@@ -90,6 +106,13 @@ public class GatewayBearerAuthAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = GatewayBearerAuthConfigProperties.PREFIX, name = "introspection-uri")
+    @ConditionalOnMissingBean(OpaqueTokenIntrospector.class)
+    OpaqueTokenIntrospector bearerOpaqueTokenIntrospector(GatewayBearerAuthConfigProperties properties) {
+        return new GeoNodeOpaqueTokenIntrospector(properties);
+    }
+
+    @Bean
     JwtAuthenticationConverter bearerJwtAuthenticationConverter(GatewayBearerAuthConfigProperties properties) {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setPrincipalClaimName(properties.getUsernameClaim());
@@ -114,7 +137,10 @@ public class GatewayBearerAuthAutoConfiguration {
             if (!(sourceRole instanceof String role)) continue;
             String mappedRole = properties.getRoleMappings().get(role);
             if (mappedRole != null && !mappedRole.isBlank()) {
-                authorities.add(new SimpleGrantedAuthority(properties.getRolePrefix() + mappedRole));
+                String prefix = properties.getRolePrefix();
+                String authority =
+                        !prefix.isEmpty() && mappedRole.startsWith(prefix) ? mappedRole : prefix + mappedRole;
+                authorities.add(new SimpleGrantedAuthority(authority));
             }
         }
         return authorities;
