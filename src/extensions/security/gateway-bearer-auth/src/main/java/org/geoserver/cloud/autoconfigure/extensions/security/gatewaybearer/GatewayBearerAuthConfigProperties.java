@@ -24,11 +24,8 @@ public class GatewayBearerAuthConfigProperties {
     /** OIDC issuer URI; must match the token's {@code iss} claim. */
     private String issuerUri;
 
-    /** Optional OAuth token introspection URI for opaque access tokens. */
-    private String introspectionUri;
-
-    /** Shared secret sent to a protected introspection endpoint. */
-    private String introspectionApiKey;
+    /** Optional internal JWKS endpoint override when the advertised endpoint is not reachable from the gateway. */
+    private String jwkSetUri;
 
     /** Required audience identifying this GeoServer Cloud API. */
     private String audience;
