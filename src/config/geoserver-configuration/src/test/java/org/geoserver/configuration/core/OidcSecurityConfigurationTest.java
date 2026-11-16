@@ -23,6 +23,7 @@ class OidcSecurityConfigurationTest {
     private final WebApplicationContextRunner runner = new WebApplicationContextRunner()
             .withBean(
                     "authenticationManager", GeoServerSecurityManager.class, () -> mock(GeoServerSecurityManager.class))
+            .withPropertyValues("geoserver.extension.security.oidc-login.enabled=true")
             .withConfiguration(UserConfigurations.of(OidcSecurityConfiguration.class, WebSecCoreConfiguration.class));
 
     @Test
@@ -36,10 +37,12 @@ class OidcSecurityConfigurationTest {
     }
 
     @Test
-    void commonSecurityConfigurationImportsOidcProviderForEveryService() {
+    void commonSecurityConfigurationLeavesOidcLoginOutOfEveryService() {
         assertThat(GeoServerMainSecurityConfiguration.class
                         .getAnnotation(Import.class)
                         .value())
+                .doesNotContain(OidcSecurityConfiguration.class);
+        assertThat(WebSecCoreConfiguration.class.getAnnotation(Import.class).value())
                 .contains(OidcSecurityConfiguration.class);
     }
 }

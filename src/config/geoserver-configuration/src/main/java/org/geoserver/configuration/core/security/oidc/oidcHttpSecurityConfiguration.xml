@@ -5,7 +5,8 @@
   <bean id="oidcObjectPostProcessorConfiguration"
         class="org.springframework.security.config.annotation.configuration.ObjectPostProcessorConfiguration" />
   <bean id="oidcAuthenticationConfiguration"
-        class="org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration" />
+        class="org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration"
+        primary="true" />
   <bean id="oidcHttpSecurityConfiguration"
         class="org.springframework.security.config.annotation.web.configuration.HttpSecurityConfiguration"
         depends-on="contentNegotiationStrategy,oidcObjectPostProcessorConfiguration,oidcAuthenticationConfiguration" />

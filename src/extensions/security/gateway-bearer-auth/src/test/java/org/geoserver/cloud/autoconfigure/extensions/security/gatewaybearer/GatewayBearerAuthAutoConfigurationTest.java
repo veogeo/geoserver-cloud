@@ -33,5 +33,4 @@ class GatewayBearerAuthAutoConfigurationTest {
                     assertThat(context).doesNotHaveBean(GatewayBearerAuthAutoConfiguration.class);
                 });
     }
-
 }

@@ -8,11 +8,11 @@
   </parent>
   <artifactId>gs-cloud-starter-gateway-security</artifactId>
   <packaging>jar</packaging>
-  <description>Spring Boot starter for gateway-side GeoServer Cloud security</description>
+  <description>Spring Boot starter for gateway session security</description>
   <dependencies>
     <dependency>
-      <groupId>org.geoserver.cloud.extensions</groupId>
-      <artifactId>gs-cloud-extension-security-gateway-bearer-auth</artifactId>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
   </dependencies>
 </project>

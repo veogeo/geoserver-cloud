@@ -18,12 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.geoserver.cloud.autoconfigure.gateway.SharedAuthConfigurationProperties;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.AbstractOAuth2TokenAuthenticationToken;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 import org.springframework.web.servlet.function.HandlerFilterFunction;
@@ -38,7 +33,8 @@ import org.springframework.web.servlet.function.ServerResponse;
  * exchange call to handle both request header manipulation (pre) and response header capture (post).
  *
  * <p>Pre-processing: strips incoming {@code x-gsc-username} and {@code x-gsc-roles} headers to prevent external
- * impersonation, then injects session-stored credentials for downstream services.
+ * impersonation, then injects session-stored credentials for downstream services. Bearer tokens are passed through
+ * untouched for validation by the GeoServer service receiving the request.
  *
  * <p>Post-processing: captures {@code x-gsc-username} and {@code x-gsc-roles} from the proxied response, updates the
  * session accordingly, and removes these headers from the final client response.
@@ -67,17 +63,13 @@ class GatewaySharedAuth implements HandlerFilterFunction<ServerResponse, ServerR
 
         // PRE: strip incoming x-gsc-* headers (prevent impersonation),
         //      inject session-stored credentials for downstream
-        AbstractOAuth2TokenAuthenticationToken<?> bearerAuthentication = currentBearerAuthentication();
-        ServerRequest modifiedRequest = preProcess(request, bearerAuthentication);
+        ServerRequest modifiedRequest = preProcess(request);
 
         // Proxy exchange
         ServerResponse response = next.handle(modifiedRequest);
 
         // POST: capture x-gsc-* from response, update session, strip from response
-        postProcess(servletRequest, response, bearerAuthentication != null);
-        if (bearerAuthentication != null) {
-            response.headers().setCacheControl("private, no-store");
-        }
+        postProcess(servletRequest, response);
         return response;
     }
 
@@ -92,30 +84,19 @@ class GatewaySharedAuth implements HandlerFilterFunction<ServerResponse, ServerR
      * Strips incoming shared-auth headers to prevent impersonation and adds session-stored credentials for downstream
      * services.
      */
-    private static ServerRequest preProcess(
-            ServerRequest request, @Nullable AbstractOAuth2TokenAuthenticationToken<?> bearerAuthentication) {
+    private static ServerRequest preProcess(ServerRequest request) {
         HttpServletRequest servletRequest = request.servletRequest();
         logImpersonationAttempt(servletRequest);
 
         HttpSession session = servletRequest.getSession(false);
-        String username = bearerAuthentication != null
-                ? bearerAuthentication.getName()
-                : session != null ? (String) session.getAttribute(X_GSCLOUD_USERNAME) : null;
+        String username = session != null ? (String) session.getAttribute(X_GSCLOUD_USERNAME) : null;
         @SuppressWarnings("unchecked")
-        List<String> roles = bearerAuthentication != null
-                ? bearerAuthentication.getAuthorities().stream()
-                        .map(GrantedAuthority::getAuthority)
-                        .filter(authority -> !authority.startsWith("FACTOR_"))
-                        .toList()
-                : session != null ? (List<String>) session.getAttribute(X_GSCLOUD_ROLES) : null;
+        List<String> roles = session != null ? (List<String>) session.getAttribute(X_GSCLOUD_ROLES) : null;
 
         ServerRequest.Builder builder = ServerRequest.from(request);
         builder.headers(headers -> {
             headers.remove(X_GSCLOUD_USERNAME);
             headers.remove(X_GSCLOUD_ROLES);
-            if (bearerAuthentication != null) {
-                headers.remove(HttpHeaders.AUTHORIZATION);
-            }
 
             if (StringUtils.hasText(username)) {
                 List<String> sessionRoles = roles != null ? roles : List.of();
@@ -123,8 +104,8 @@ class GatewaySharedAuth implements HandlerFilterFunction<ServerResponse, ServerR
                 sessionRoles.forEach(role -> headers.add(X_GSCLOUD_ROLES, role));
                 if (log.isDebugEnabled()) {
                     log.debug(
-                            "appended shared-auth request headers from {} {}: {}, {}: {} to {} {}",
-                            bearerAuthentication != null ? "Bearer token" : "session[%s]".formatted(session.getId()),
+                            "appended shared-auth request headers from session[{}] {}: {}, {}: {} to {} {}",
+                            session.getId(),
                             X_GSCLOUD_USERNAME,
                             urlEncode(username),
                             X_GSCLOUD_ROLES,
@@ -148,10 +129,9 @@ class GatewaySharedAuth implements HandlerFilterFunction<ServerResponse, ServerR
      * Captures shared-auth headers from the proxied response, updates the session, and removes them from the final
      * response.
      */
-    private static void postProcess(
-            HttpServletRequest servletRequest, ServerResponse response, boolean bearerAuthenticated) {
+    private static void postProcess(HttpServletRequest servletRequest, ServerResponse response) {
         @Nullable List<String> responseUser = response.headers().remove(X_GSCLOUD_USERNAME);
-        if (responseUser != null && !bearerAuthenticated) {
+        if (responseUser != null) {
             String username = responseUser.get(0);
             if (StringUtils.hasText(username)) {
                 List<String> roles = response.headers().getOrDefault(X_GSCLOUD_ROLES, List.of());
@@ -164,14 +144,6 @@ class GatewaySharedAuth implements HandlerFilterFunction<ServerResponse, ServerR
         // Always remove shared-auth headers from the final response
         response.headers().remove(X_GSCLOUD_USERNAME);
         response.headers().remove(X_GSCLOUD_ROLES);
-    }
-
-    @Nullable
-    private static AbstractOAuth2TokenAuthenticationToken<?> currentBearerAuthentication() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication instanceof AbstractOAuth2TokenAuthenticationToken<?> bearer && bearer.isAuthenticated()
-                ? bearer
-                : null;
     }
 
     private static void loggedIn(HttpServletRequest request, @NonNull String user, List<String> roles) {

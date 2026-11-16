@@ -8,15 +8,28 @@
   </parent>
   <artifactId>gs-cloud-extension-security-gateway-bearer-auth</artifactId>
   <packaging>jar</packaging>
-  <description>Gateway OIDC Bearer authentication extension</description>
+  <description>OIDC Bearer JWT authentication extension for GeoServer services</description>
   <dependencies>
     <dependency>
       <groupId>org.geoserver.cloud.extensions</groupId>
       <artifactId>gs-cloud-extensions-core</artifactId>
     </dependency>
+    <!-- Use Spring Security's resource-server APIs without activating Boot's default form-login chain. -->
     <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-config</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-oauth2-resource-server</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-oauth2-jose</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

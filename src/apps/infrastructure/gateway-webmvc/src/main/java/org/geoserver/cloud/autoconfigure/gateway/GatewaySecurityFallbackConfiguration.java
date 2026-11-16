@@ -5,7 +5,6 @@
 
 package org.geoserver.cloud.autoconfigure.gateway;
 
-import org.geoserver.cloud.autoconfigure.extensions.security.gatewaybearer.GatewayBearerAuthAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -16,7 +15,6 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /** Keeps the gateway's existing public route behavior when no other security chain is configured. */
 @AutoConfiguration(
-        after = GatewayBearerAuthAutoConfiguration.class,
         beforeName = "org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration")
 public class GatewaySecurityFallbackConfiguration {
 

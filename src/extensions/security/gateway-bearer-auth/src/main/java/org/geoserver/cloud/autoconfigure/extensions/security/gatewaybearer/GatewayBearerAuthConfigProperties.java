@@ -10,15 +10,15 @@ import java.util.Map;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/** Configuration properties for optional gateway-side OIDC Bearer authentication. */
+/** Configuration properties for optional OIDC Bearer JWT authentication in GeoServer services. */
 @Data
 @ConfigurationProperties(prefix = GatewayBearerAuthConfigProperties.PREFIX)
 public class GatewayBearerAuthConfigProperties {
 
-    public static final String PREFIX = "geoserver.extension.security.gateway-bearer-auth";
+    public static final String PREFIX = "geoserver.extension.security.bearer-auth";
     public static final boolean DEFAULT = false;
 
-    /** Whether Bearer authentication is enabled (default: false). */
+    /** Whether service-side Bearer JWT authentication is enabled (default: false). */
     private boolean enabled = DEFAULT;
 
     /** OIDC issuer URI; must match the token's {@code iss} claim. */

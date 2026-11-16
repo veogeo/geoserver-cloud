@@ -10,14 +10,18 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
@@ -31,20 +35,33 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.web.accept.ContentNegotiationStrategy;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
-/** Validates OIDC access-token JWTs at the gateway and provides the identity to SharedAuth. */
+/** Validates OIDC access-token JWTs in the GeoServer service receiving the request. */
 @AutoConfiguration
 @ConditionalOnGatewayBearerAuth
 @EnableConfigurationProperties(GatewayBearerAuthConfigProperties.class)
+@EnableWebSecurity
 public class GatewayBearerAuthAutoConfiguration {
+
+    /**
+     * GeoServer REST also exposes a style-PUT-specific content negotiation strategy. Spring Security expects a single
+     * strategy when creating HttpSecurity, so explicitly use the regular MVC manager for security negotiation.
+     */
+    @Bean
+    @Primary
+    @ConditionalOnBean(name = "mvcContentNegotiationManager")
+    ContentNegotiationStrategy bearerAuthContentNegotiationStrategy(
+            @Qualifier("mvcContentNegotiationManager") ContentNegotiationStrategy mvcContentNegotiationManager) {
+        return mvcContentNegotiationManager;
+    }
 
     @Bean
     @Order(1)
     SecurityFilterChain bearerTokenSecurityFilterChain(
-            HttpSecurity http,
-            JwtAuthenticationConverter bearerJwtAuthenticationConverter) throws Exception {
+            HttpSecurity http, JwtAuthenticationConverter bearerJwtAuthenticationConverter) throws Exception {
         http.securityMatcher(bearerTokenRequestMatcher())
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
@@ -59,7 +76,7 @@ public class GatewayBearerAuthAutoConfiguration {
     RequestMatcher bearerTokenRequestMatcher() {
         return request -> {
             String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
-            return authorization != null && authorization.regionMatches(true, 0, "Bearer", 0, 6);
+            return authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7);
         };
     }
 

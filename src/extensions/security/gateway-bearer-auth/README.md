@@ -1,16 +1,16 @@
-# GeoServer Cloud Gateway OIDC JWT Authentication Extension
+# GeoServer Cloud OIDC JWT Bearer Authentication Extension
 
-Validates signed OIDC **access-token JWTs** at the gateway and passes the verified identity to backend services via the existing `SharedAuth` request headers. The raw token is not forwarded to backend services. Opaque tokens and OIDC ID tokens are rejected.
+Validates signed OIDC **access-token JWTs** independently in each GeoServer service. The gateway can forward the original bearer token unchanged; each service verifies its signature, issuer, audience, and expiry before using the configured username and roles. Opaque tokens and OIDC ID tokens are rejected.
 
 ## Configuration
 
-This extension is disabled by default. Enable it and configure the active issuer, the GeoServer audience, token claims, and explicit role mappings:
+This extension is disabled by default in every service. Enable it and configure the active issuer, the GeoServer audience, token claims, and explicit role mappings:
 
 ```yaml
 geoserver:
   extension:
     security:
-      gateway-bearer-auth:
+      bearer-auth:
         enabled: true
         issuer-uri: https://identity.example/realms/geonode
         # Optional internal JWKS endpoint if the issuer's advertised URL is unreachable from the gateway.
@@ -28,4 +28,4 @@ When `jwk-set-uri` is omitted, the extension uses OIDC discovery from `issuer-ur
 
 Only roles listed in `role-mappings` are accepted. Map them to GeoServer roles used by `security/layers.properties`. The audience must identify GeoServer Cloud, and the identity provider must issue a signed JWT **access token** for that audience. OIDC does not require access tokens to be JWTs; an opaque access token will be rejected. Never use an OIDC ID token as an OGC access token.
 
-Requests without a Bearer header retain the existing public-resource and WebUI session behavior. Keep `SharedAuth` enabled on every route to the backend services.
+Requests without a Bearer header retain the configured GeoServer public-resource and WebUI session behavior. The gateway does not need to authenticate the Bearer token for backend services to authorize it.

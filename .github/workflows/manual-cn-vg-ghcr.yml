@@ -115,8 +115,10 @@ jobs:
             geoserver-cloud-webui
           )
           for image in "${images[@]}"; do
-            docker buildx imagetools create \
-              --tag "${REPOSITORY}/${image}:${TAG}" \
-              "${REPOSITORY}/${image}:${TAG}-amd64" \
-              "${REPOSITORY}/${image}:${TAG}-arm64"
+            for published_tag in "${TAG}" latest cn-vg-latest; do
+              docker buildx imagetools create \
+                --tag "${REPOSITORY}/${image}:${published_tag}" \
+                "${REPOSITORY}/${image}:${TAG}-amd64" \
+                "${REPOSITORY}/${image}:${TAG}-arm64"
+            done
           done
