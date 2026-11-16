@@ -20,6 +20,7 @@ import org.geoserver.security.GeoServerSecurityFilterChain;
 import org.geoserver.security.GeoServerSecurityManager;
 import org.geoserver.security.RequestFilterChain;
 import org.geoserver.security.config.SecurityManagerConfig;
+import org.geoserver.security.config.SecurityFilterConfig;
 import org.geoserver.security.oauth2.config.GeoServerOAuth2LoginFilterConfig;
 import org.geoserver.security.oauth2.config.OpenIdRoleSource;
 import org.geoserver.security.oauth2.login.GeoServerOAuth2LoginAuthenticationFilter;
@@ -60,10 +61,20 @@ public class CloudOidcLoginInitializer {
         String discoveryUri = required(
                 "NOXT_GEOSERVER_CLOUD_DISCOVERY_URI", issuer + ".well-known/openid-configuration/");
 
-        GeoServerOAuth2LoginFilterConfig filterConfig = createFilterConfig(
-                clientId, clientSecret, siteUrl, issuer, discoveryUri);
         Lock lock = securityManager.security().lock();
         try {
+            SecurityFilterConfig existingConfig = securityManager.loadFilterConfig(FILTER_NAME, false);
+            if (existingConfig != null && !(existingConfig instanceof GeoServerOAuth2LoginFilterConfig)) {
+                throw new IllegalStateException(
+                        "A non-OIDC security filter named '" + FILTER_NAME + "' already exists.");
+            }
+            GeoServerOAuth2LoginFilterConfig filterConfig = createFilterConfig(
+                    clientId,
+                    clientSecret,
+                    siteUrl,
+                    issuer,
+                    discoveryUri,
+                    (GeoServerOAuth2LoginFilterConfig) existingConfig);
             securityManager.saveFilter(filterConfig);
             addFilterToWebChain();
             log.info("Configured optional GeoNode Cloud OIDC login filter '{}'.", FILTER_NAME);
@@ -75,12 +86,19 @@ public class CloudOidcLoginInitializer {
     }
 
     private GeoServerOAuth2LoginFilterConfig createFilterConfig(
-            String clientId, String clientSecret, String siteUrl, String issuer, String discoveryUri) {
+            String clientId,
+            String clientSecret,
+            String siteUrl,
+            String issuer,
+            String discoveryUri,
+            GeoServerOAuth2LoginFilterConfig existingConfig) {
         Map<String, String> metadata = isGeoNodeIssuer(issuer, siteUrl)
                 ? geoNodeMetadata(siteUrl)
                 : readProviderMetadata(discoveryUri);
 
-        GeoServerOAuth2LoginFilterConfig config = new GeoServerOAuth2LoginFilterConfig();
+        GeoServerOAuth2LoginFilterConfig config = existingConfig == null
+                ? new GeoServerOAuth2LoginFilterConfig()
+                : existingConfig;
         config.setName(FILTER_NAME);
         config.setClassName(GeoServerOAuth2LoginAuthenticationFilter.class.getName());
         config.setOidcEnabled(true);
