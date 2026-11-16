@@ -53,6 +53,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Apply build-only ACL Data Access Rules CSP patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          geoserver_dir="$GITHUB_WORKSPACE/geoserver_submodule/geoserver"
+          patch_file="$GITHUB_WORKSPACE/build-patches/acl-data-rules-csp.patch"
+          git -C "$geoserver_dir" apply --check "$patch_file"
+          git -C "$geoserver_dir" apply "$patch_file"
+          git -C "$geoserver_dir" diff --check
+
       - name: Run the complete build and test suite
         run: make
         env:
