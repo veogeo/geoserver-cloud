@@ -5,8 +5,19 @@
 
 package org.geoserver.cloud.autoconfigure.extensions.security.gatewaybearer;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -22,22 +33,29 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
+import org.springframework.security.oauth2.jwt.JwtTypeValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.accept.ContentNegotiationStrategy;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 /** Validates OIDC access-token JWTs in the GeoServer service receiving the request. */
 @AutoConfiguration
@@ -69,6 +87,7 @@ public class GatewayBearerAuthAutoConfiguration {
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated());
         http.oauth2ResourceServer(resourceServer ->
                 resourceServer.jwt(jwt -> jwt.jwtAuthenticationConverter(bearerJwtAuthenticationConverter)));
+        http.addFilterAfter(new GeoServerSharedAuthBridgeFilter(), BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
@@ -96,11 +115,16 @@ public class GatewayBearerAuthAutoConfiguration {
         Assert.hasText(
                 properties.getRolePrefix(), GatewayBearerAuthConfigProperties.PREFIX + ".role-prefix is required");
 
-        NimbusJwtDecoder decoder = StringUtils.hasText(properties.getJwkSetUri())
-                ? NimbusJwtDecoder.withJwkSetUri(properties.getJwkSetUri()).build()
-                : NimbusJwtDecoder.withIssuerLocation(properties.getIssuerUri()).build();
-        OAuth2TokenValidator<Jwt> issuerAndTimeValidator =
-                JwtValidators.createDefaultWithIssuer(properties.getIssuerUri());
+        NimbusJwtDecoder decoder = (StringUtils.hasText(properties.getJwkSetUri())
+                        ? NimbusJwtDecoder.withJwkSetUri(properties.getJwkSetUri())
+                        : NimbusJwtDecoder.withIssuerLocation(properties.getIssuerUri()))
+                .jwtProcessorCustomizer(processor -> processor.setJWSTypeVerifier(
+                        new DefaultJOSEObjectTypeVerifier<>(JOSEObjectType.JWT, new JOSEObjectType("at+jwt"))))
+                .build();
+        OAuth2TokenValidator<Jwt> issuerAndTimeValidator = new DelegatingOAuth2TokenValidator<>(
+                new JwtTypeValidator("JWT", "at+jwt"),
+                new JwtTimestampValidator(),
+                new JwtIssuerValidator(properties.getIssuerUri()));
         OAuth2TokenValidator<Jwt> audienceValidator = jwt -> jwt.getAudience().contains(properties.getAudience())
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(
@@ -115,6 +139,65 @@ public class GatewayBearerAuthAutoConfiguration {
         converter.setPrincipalClaimName(properties.getUsernameClaim());
         converter.setJwtGrantedAuthoritiesConverter(jwt -> mappedAuthorities(jwt, properties));
         return converter;
+    }
+
+    /**
+     * Bridges the JWT identity verified by Spring Security into GeoServer's native shared-auth filter chain.
+     * The gateway strips client-supplied x-gsc-* headers; these values are synthesized only after JWT validation.
+     */
+    private static final class GeoServerSharedAuthBridgeFilter extends OncePerRequestFilter {
+        private static final String USERNAME_HEADER = "x-gsc-username";
+        private static final String ROLES_HEADER = "x-gsc-roles";
+
+        @Override
+        protected void doFilterInternal(
+                HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+                throws ServletException, IOException {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (!(authentication instanceof JwtAuthenticationToken) || !authentication.isAuthenticated()
+                    || !StringUtils.hasText(authentication.getName())) {
+                chain.doFilter(request, response);
+                return;
+            }
+
+            String username = authentication.getName();
+            List<String> roles = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .filter(StringUtils::hasText)
+                    .distinct()
+                    .toList();
+            response.setHeader(USERNAME_HEADER, username);
+            roles.forEach(role -> response.addHeader(ROLES_HEADER, role));
+
+            HttpServletRequest trustedRequest = new HttpServletRequestWrapper(request) {
+                @Override
+                public String getHeader(String name) {
+                    if (USERNAME_HEADER.equalsIgnoreCase(name)) return username;
+                    if (ROLES_HEADER.equalsIgnoreCase(name)) return roles.stream().findFirst().orElse(null);
+                    return super.getHeader(name);
+                }
+
+                @Override
+                public Enumeration<String> getHeaders(String name) {
+                    if (USERNAME_HEADER.equalsIgnoreCase(name)) return Collections.enumeration(List.of(username));
+                    if (ROLES_HEADER.equalsIgnoreCase(name)) return Collections.enumeration(roles);
+                    return super.getHeaders(name);
+                }
+
+                @Override
+                public Enumeration<String> getHeaderNames() {
+                    LinkedHashSet<String> names = new LinkedHashSet<>();
+                    Enumeration<String> existingNames = super.getHeaderNames();
+                    while (existingNames != null && existingNames.hasMoreElements()) {
+                        names.add(existingNames.nextElement());
+                    }
+                    names.add(USERNAME_HEADER);
+                    if (!roles.isEmpty()) names.add(ROLES_HEADER);
+                    return Collections.enumeration(names);
+                }
+            };
+            chain.doFilter(trustedRequest, response);
+        }
     }
 
     private static Collection<GrantedAuthority> mappedAuthorities(
