@@ -19,8 +19,8 @@ import org.geoserver.platform.resource.Resource.Lock;
 import org.geoserver.security.GeoServerSecurityFilterChain;
 import org.geoserver.security.GeoServerSecurityManager;
 import org.geoserver.security.RequestFilterChain;
-import org.geoserver.security.config.SecurityManagerConfig;
 import org.geoserver.security.config.SecurityFilterConfig;
+import org.geoserver.security.config.SecurityManagerConfig;
 import org.geoserver.security.oauth2.config.GeoServerOAuth2LoginFilterConfig;
 import org.geoserver.security.oauth2.config.OpenIdRoleSource;
 import org.geoserver.security.oauth2.login.GeoServerOAuth2LoginAuthenticationFilter;
@@ -37,8 +37,7 @@ import org.springframework.web.client.RestTemplate;
 @Slf4j
 @Configuration(proxyBeanMethods = false)
 @RequiredArgsConstructor
-@ConditionalOnProperty(
-        prefix = "geoserver.extension.security.oidc-login", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "geoserver.extension.security.oidc-login", name = "enabled", havingValue = "true")
 public class CloudOidcLoginInitializer {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -58,8 +57,10 @@ public class CloudOidcLoginInitializer {
         String clientSecret = required("NOXT_GEOSERVER_CLOUD_OIDC_CLIENT_SECRET");
         String siteUrl = required("SITEURL");
         String issuer = required("NOXT_GEOSERVER_CLOUD_ISSUER_URI", siteUrl + "/o/");
-        String discoveryUri = required(
-                "NOXT_GEOSERVER_CLOUD_DISCOVERY_URI", issuer + ".well-known/openid-configuration/");
+        String defaultDiscoveryUri = isGeoNodeIssuer(issuer, siteUrl)
+                ? "http://django:8000/o/.well-known/openid-configuration/"
+                : trimTrailingSlash(issuer) + "/.well-known/openid-configuration/";
+        String discoveryUri = required("NOXT_GEOSERVER_CLOUD_DISCOVERY_URI", defaultDiscoveryUri);
 
         Lock lock = securityManager.security().lock();
         try {
@@ -69,12 +70,8 @@ public class CloudOidcLoginInitializer {
                         "A non-OIDC security filter named '" + FILTER_NAME + "' already exists.");
             }
             GeoServerOAuth2LoginFilterConfig filterConfig = createFilterConfig(
-                    clientId,
-                    clientSecret,
-                    siteUrl,
-                    issuer,
-                    discoveryUri,
-                    (GeoServerOAuth2LoginFilterConfig) existingConfig);
+                    clientId, clientSecret, siteUrl, issuer, discoveryUri, (GeoServerOAuth2LoginFilterConfig)
+                            existingConfig);
             securityManager.saveFilter(filterConfig);
             addFilterToWebChain();
             log.info("Configured optional GeoNode Cloud OIDC login filter '{}'.", FILTER_NAME);
@@ -92,13 +89,11 @@ public class CloudOidcLoginInitializer {
             String issuer,
             String discoveryUri,
             GeoServerOAuth2LoginFilterConfig existingConfig) {
-        Map<String, String> metadata = isGeoNodeIssuer(issuer, siteUrl)
-                ? geoNodeMetadata(siteUrl)
-                : readProviderMetadata(discoveryUri);
+        Map<String, String> metadata =
+                isGeoNodeIssuer(issuer, siteUrl) ? geoNodeMetadata(siteUrl) : readProviderMetadata(discoveryUri);
 
-        GeoServerOAuth2LoginFilterConfig config = existingConfig == null
-                ? new GeoServerOAuth2LoginFilterConfig()
-                : existingConfig;
+        GeoServerOAuth2LoginFilterConfig config =
+                existingConfig == null ? new GeoServerOAuth2LoginFilterConfig() : existingConfig;
         config.setName(FILTER_NAME);
         config.setClassName(GeoServerOAuth2LoginAuthenticationFilter.class.getName());
         config.setOidcEnabled(true);
@@ -110,15 +105,16 @@ public class CloudOidcLoginInitializer {
         config.setOidcJwkSetUri(metadata.get("jwks_uri"));
         config.setOidcLogoutUri(metadata.get("end_session_endpoint"));
         config.setOidcDiscoveryUri(discoveryUri);
-        config.setOidcScopes(environment.getProperty("NOXT_GEOSERVER_CLOUD_OIDC_SCOPES", "openid profile email groups"));
+        config.setOidcScopes(
+                environment.getProperty("NOXT_GEOSERVER_CLOUD_OIDC_SCOPES", "openid profile email groups"));
         config.setOidcUserNameAttribute(
                 environment.getProperty("NOXT_GEOSERVER_CLOUD_USERNAME_CLAIM", "preferred_username"));
         config.setTokenRolesClaim(environment.getProperty("NOXT_GEOSERVER_CLOUD_ROLES_CLAIM", "groups"));
         config.setRoleSource(OpenIdRoleSource.UserInfo);
-        config.setRoleConverterString(
-                environment.getProperty("NOXT_GEOSERVER_CLOUD_OIDC_ROLE_CONVERTER", ""));
+        config.setRoleConverterString(environment.getProperty("NOXT_GEOSERVER_CLOUD_OIDC_ROLE_CONVERTER", ""));
         config.setOnlyExternalListedRoles(false);
-        config.setAllowAdminLogin(false);
+        config.setAllowAdminLogin(
+                Boolean.parseBoolean(environment.getProperty("NOXT_GEOSERVER_CLOUD_OIDC_ALLOW_ADMIN_LOGIN", "false")));
         // Resource-server JWT validation is handled by the per-service bearer-auth extension.
         config.setEnableResourceServerMode(false);
         config.setOidcUsePKCE(true);
@@ -188,7 +184,10 @@ public class CloudOidcLoginInitializer {
     }
 
     private String required(String key, String defaultValue) {
-        String value = environment.getProperty(key, defaultValue);
+        String value = environment.getProperty(key);
+        if (!StringUtils.hasText(value)) {
+            value = defaultValue;
+        }
         if (!StringUtils.hasText(value)) {
             throw new IllegalStateException("Set " + key + " when GeoServer Cloud OIDC Web login is enabled.");
         }
