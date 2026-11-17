@@ -11,6 +11,7 @@ import org.geoserver.platform.ModuleStatus;
 import org.geoserver.platform.ModuleStatusImpl;
 import org.geoserver.wms.WMS;
 import org.geowebcache.layer.TileLayerDispatcher;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Configuration;
 public class WmtsMultiDimensionalConfiguration {
 
     @Bean
+    @ConditionalOnBean(WMS.class)
     MultiDimensionalExtension wmtsMultidimensionalExtension(
             GeoServer geoServer, WMS wms, Catalog catalog, TileLayerDispatcher tileLayerDispatcher) {
         return new MultiDimensionalExtension(geoServer, wms, catalog, tileLayerDispatcher);
