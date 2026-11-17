@@ -13,7 +13,6 @@ import org.geoserver.cloud.gwc.event.ConfigChangeEvent;
 import org.geoserver.config.util.XStreamPersisterFactory;
 import org.geoserver.configuration.gwc.GwcGeoServerContextConfiguration;
 import org.geoserver.configuration.gwc.GwcImageCodecsConfiguration;
-import org.geoserver.configuration.gwc.WmtsMultiDimensionalConfiguration;
 import org.geoserver.gwc.config.CloudGwcConfigPersister;
 import org.geoserver.gwc.config.GWCConfigPersister;
 import org.geoserver.platform.GeoServerResourceLoader;
