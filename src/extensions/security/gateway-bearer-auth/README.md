@@ -28,4 +28,6 @@ When `jwk-set-uri` is omitted, the extension uses OIDC discovery from `issuer-ur
 
 Only roles listed in `role-mappings` are accepted. Map them to GeoServer roles used by `security/layers.properties`. The audience must identify GeoServer Cloud, and the identity provider must issue a signed JWT **access token** for that audience. OIDC does not require access tokens to be JWTs; an opaque access token will be rejected. Never use an OIDC ID token as an OGC access token.
 
+`role-prefix` is optional and defaults to `ROLE_`. Set it to an empty string when a mapping must be passed through exactly, such as GeoNode's `admin` group mapping to GeoServer's `ADMIN` role.
+
 Requests without a Bearer header retain the configured GeoServer public-resource and WebUI session behavior. The gateway does not need to authenticate the Bearer token for backend services to authorize it.

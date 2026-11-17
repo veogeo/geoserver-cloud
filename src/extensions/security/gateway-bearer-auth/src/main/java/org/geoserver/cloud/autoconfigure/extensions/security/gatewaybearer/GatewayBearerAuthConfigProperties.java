@@ -39,6 +39,6 @@ public class GatewayBearerAuthConfigProperties {
     /** Explicit mapping from IdP role names to GeoServer role names. Unmapped roles are discarded. */
     private Map<String, String> roleMappings = new LinkedHashMap<>();
 
-    /** Prefix expected by GeoServer Cloud's shared-auth role converter. */
+    /** Prefix added to mapped role names that don't already include it; set empty for exact role names. */
     private String rolePrefix = "ROLE_";
 }
