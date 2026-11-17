@@ -13,6 +13,7 @@ import org.geoserver.cloud.gwc.event.ConfigChangeEvent;
 import org.geoserver.config.util.XStreamPersisterFactory;
 import org.geoserver.configuration.gwc.GwcGeoServerContextConfiguration;
 import org.geoserver.configuration.gwc.GwcImageCodecsConfiguration;
+import org.geoserver.configuration.gwc.WmtsMultiDimensionalConfiguration;
 import org.geoserver.gwc.config.CloudGwcConfigPersister;
 import org.geoserver.gwc.config.GWCConfigPersister;
 import org.geoserver.platform.GeoServerResourceLoader;
@@ -34,7 +35,9 @@ import org.springframework.context.annotation.Import;
  */
 @AutoConfiguration
 @ConditionalOnGeoWebCacheEnabled
-@Import({GwcGeoServerContextConfiguration.class, GwcImageCodecsConfiguration.class})
+@Import({
+    GwcGeoServerContextConfiguration.class, GwcImageCodecsConfiguration.class, WmtsMultiDimensionalConfiguration.class
+})
 @Slf4j(topic = "org.geoserver.cloud.autoconfigure.gwc.core")
 @SuppressWarnings("java:S1118") // Suppress SonarLint warning, constructor needs to be public
 public class GeoServerIntegrationAutoConfiguration {

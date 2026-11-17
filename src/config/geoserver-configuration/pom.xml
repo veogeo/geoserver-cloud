@@ -96,6 +96,12 @@
       <optional>true</optional>
     </dependency>
     <dependency>
+      <groupId>org.geoserver.extension</groupId>
+      <artifactId>gs-wmts-multi-dimensional</artifactId>
+      <version>${gs.version}</version>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
       <groupId>org.geoserver</groupId>
       <artifactId>gs-gwc-rest</artifactId>
       <optional>true</optional>
@@ -477,6 +483,11 @@
             <path>
               <groupId>org.geoserver</groupId>
               <artifactId>gs-gwc</artifactId>
+            </path>
+            <path>
+              <groupId>org.geoserver.extension</groupId>
+              <artifactId>gs-wmts-multi-dimensional</artifactId>
+              <version>${gs.version}</version>
             </path>
             <path>
               <groupId>org.geoserver</groupId>
