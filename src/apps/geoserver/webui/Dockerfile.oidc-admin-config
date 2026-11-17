@@ -1,0 +1,6 @@
+ARG BASE_IMAGE=ghcr.io/veogeo/geoserver-cloud-webui:latest
+FROM ${BASE_IMAGE}
+
+# Replace only the OIDC initializer in the published WebUI image. All application
+# libraries and binaries remain those from the GHCR image.
+COPY target/classes/org/geoserver/cloud/autoconfigure/web/security/CloudOidcLoginInitializer.class /opt/app/bin/BOOT-INF/classes/org/geoserver/cloud/autoconfigure/web/security/CloudOidcLoginInitializer.class

@@ -1,0 +1,10 @@
+**
+!target/
+!target/classes/
+!target/classes/org/
+!target/classes/org/geoserver/
+!target/classes/org/geoserver/cloud/
+!target/classes/org/geoserver/cloud/autoconfigure/
+!target/classes/org/geoserver/cloud/autoconfigure/web/
+!target/classes/org/geoserver/cloud/autoconfigure/web/security/
+!target/classes/org/geoserver/cloud/autoconfigure/web/security/CloudOidcLoginInitializer.class
