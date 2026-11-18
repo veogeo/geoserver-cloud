@@ -1,0 +1,65 @@
+diff --git a/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel$UpDownButtonsPanel.css b/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel$UpDownButtonsPanel.css
+index f8a1f82..14d92c2 100644
+--- a/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel$UpDownButtonsPanel.css
++++ b/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel$UpDownButtonsPanel.css
+@@ -15,3 +15,11 @@ Your css selectors should look like this to avoid modifying styles outside the p
+ 
+  ----------------------------------------------------------
+ */
++
++.gs-panel-RulesTablePanel_UpDownButtonsPanel .rules-table-action-buttons {
++  white-space: nowrap;
++}
++
++.gs-panel-RulesTablePanel_UpDownButtonsPanel .rules-table-action-hidden {
++  visibility: hidden;
++}
+diff --git a/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel$UpDownButtonsPanel.html b/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel$UpDownButtonsPanel.html
+index baccde9..3f0a856 100644
+--- a/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel$UpDownButtonsPanel.html
++++ b/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel$UpDownButtonsPanel.html
+@@ -3,10 +3,10 @@
+   <body>
+     <wicket:panel>
+       <div class="gs-panel-RulesTablePanel_UpDownButtonsPanel">
+-        <span style="white-space:nowrap">
+-          <span wicket:id="up"/>
+-          <span wicket:id="down"/>
+-          <span wicket:id="edit"/>
++        <span class="rules-table-action-buttons">
++          <span wicket:id="up" class="rules-table-action"/>
++          <span wicket:id="down" class="rules-table-action"/>
++          <span wicket:id="edit" class="rules-table-action"/>
+         </span>
+       </div>
+     </wicket:panel>
+diff --git a/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel.java b/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel.java
+index 17fc5a1..88584b2 100644
+--- a/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel.java
++++ b/src/community/acl/web/src/main/java/org/geoserver/acl/plugin/web/components/RulesTablePanel.java
+@@ -191,10 +191,8 @@ public final class RulesTablePanel<R extends Serializable> extends GeoServerTabl
+                 }
+ 
+                 protected @Override void onComponentTag(ComponentTag tag) {
+-                    if (RulesTablePanel.this.getDataProvider().canUp(rule)) {
+-                        tag.put("style", "visibility:visible");
+-                    } else {
+-                        tag.put("style", "visibility:hidden");
++                    if (!RulesTablePanel.this.getDataProvider().canUp(rule)) {
++                        tag.put("class", "rules-table-action rules-table-action-hidden");
+                     }
+                 }
+             };
+@@ -212,10 +210,8 @@ public final class RulesTablePanel<R extends Serializable> extends GeoServerTabl
+                 }
+ 
+                 protected @Override void onComponentTag(ComponentTag tag) {
+-                    if (RulesTablePanel.this.getDataProvider().canDown(rule)) {
+-                        tag.put("style", "visibility:visible");
+-                    } else {
+-                        tag.put("style", "visibility:hidden");
++                    if (!RulesTablePanel.this.getDataProvider().canDown(rule)) {
++                        tag.put("class", "rules-table-action rules-table-action-hidden");
+                     }
+                 }
+             };
