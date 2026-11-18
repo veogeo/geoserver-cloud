@@ -32,7 +32,7 @@ import org.springframework.context.annotation.Import;
         name = "enabled",
         havingValue = "true",
         matchIfMissing = true)
-@Import({WebSecCoreConfiguration.class, CloudOidcLoginInitializer.class})
+@Import(WebSecCoreConfiguration.class)
 public class WebSecCoreAutoConfiguration extends AbstractWebUIAutoConfiguration {
 
     static final String CONFIG_PREFIX = "geoserver.web-ui.security";

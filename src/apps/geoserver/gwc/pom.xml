@@ -35,18 +35,6 @@
       <artifactId>gs-wms1_1</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.geoserver.extension</groupId>
-      <artifactId>gs-wmts-multi-dimensional</artifactId>
-      <version>${gs.version}</version>
-      <exclusions>
-        <!-- This operation runs in GWC; its optional Web UI controls belong to WebUI. -->
-        <exclusion>
-          <groupId>org.geoserver.web</groupId>
-          <artifactId>gs-web-core</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-autoconfigure-processor</artifactId>
       <optional>true</optional>

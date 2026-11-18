@@ -35,7 +35,7 @@ import org.springframework.context.annotation.Import;
 @AutoConfiguration
 @ConditionalOnGeoWebCacheEnabled
 @Import({
-    GwcGeoServerContextConfiguration.class, GwcImageCodecsConfiguration.class, WmtsMultiDimensionalConfiguration.class
+    GwcGeoServerContextConfiguration.class, GwcImageCodecsConfiguration.class
 })
 @Slf4j(topic = "org.geoserver.cloud.autoconfigure.gwc.core")
 @SuppressWarnings("java:S1118") // Suppress SonarLint warning, constructor needs to be public

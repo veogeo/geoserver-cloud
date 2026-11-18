@@ -5,7 +5,6 @@
 
 package org.geoserver.configuration.core.web.sec;
 
-import org.geoserver.configuration.core.security.oidc.OidcSecurityConfiguration;
 import org.geoserver.spring.config.annotations.TranspileXmlConfig;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -21,5 +20,5 @@ import org.springframework.context.annotation.Import;
  */
 @Configuration(proxyBeanMethods = false)
 @TranspileXmlConfig(locations = "jar:gs-web-sec-core-.*!/applicationContext.xml")
-@Import({WebSecCoreConfiguration_Generated.class, OidcSecurityConfiguration.class})
+@Import({WebSecCoreConfiguration_Generated.class})
 public class WebSecCoreConfiguration {}

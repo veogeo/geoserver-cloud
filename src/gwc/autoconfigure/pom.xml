@@ -10,6 +10,11 @@
   <packaging>jar</packaging>
   <dependencies>
     <dependency>
+      <groupId>org.geoserver.cloud.extensions</groupId>
+      <artifactId>gs-cloud-extension-geonoxt-gwc</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.geoserver.cloud.gwc</groupId>
       <artifactId>gwc-cloud-core</artifactId>
     </dependency>

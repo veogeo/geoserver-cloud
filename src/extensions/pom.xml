@@ -12,6 +12,7 @@
   <name>Extensions</name>
   <modules>
     <module>core</module>
+    <module>geonoxt</module>
     <module>app-schema</module>
     <module>control-flow</module>
     <module>inspire</module>

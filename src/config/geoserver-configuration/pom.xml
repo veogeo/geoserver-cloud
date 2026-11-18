@@ -20,10 +20,6 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-autoconfigure</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.geoserver.cloud.build</groupId>
       <artifactId>gs-spring-config-transpiler</artifactId>
       <version>${project.version}</version>
@@ -198,15 +194,6 @@
     <dependency>
       <groupId>org.geoserver.web</groupId>
       <artifactId>gs-web-sec-jdbc</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>org.geoserver.extension</groupId>
-      <artifactId>gs-sec-oidc-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.geoserver.extension</groupId>
-      <artifactId>gs-sec-oidc-web</artifactId>
       <optional>true</optional>
     </dependency>
     <dependency>
@@ -417,14 +404,6 @@
             <path>
               <groupId>org.geoserver.web</groupId>
               <artifactId>gs-web-sec-ldap</artifactId>
-            </path>
-            <path>
-              <groupId>org.geoserver.extension</groupId>
-              <artifactId>gs-sec-oidc-core</artifactId>
-            </path>
-            <path>
-              <groupId>org.geoserver.extension</groupId>
-              <artifactId>gs-sec-oidc-web</artifactId>
             </path>
             <path>
               <groupId>org.geoserver</groupId>
