@@ -6,6 +6,7 @@
 package org.veogeo.geoservercloud.gateway.security;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.annotation.Order;
@@ -20,6 +21,7 @@ public class GatewaySecurityFallbackConfiguration {
 
     @Bean
     @Order(2)
+    @ConditionalOnBean(HttpSecurity.class)
     @ConditionalOnMissingBean(SecurityFilterChain.class)
     SecurityFilterChain gatewayFallbackSecurityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)

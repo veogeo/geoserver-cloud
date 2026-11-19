@@ -25,6 +25,16 @@ class GatewayBearerAuthAutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(GatewayBearerAuthAutoConfiguration.class));
 
     @Test
+    void gatewayFallbackSkipsWhenSpringSecurityHasNoHttpSecurityBean() {
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(GatewaySecurityFallbackConfiguration.class))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(SecurityFilterChain.class);
+                });
+    }
+
+    @Test
     void disabledByDefault() {
         contextRunner.run(context -> {
             assertThat(context).hasNotFailed();
