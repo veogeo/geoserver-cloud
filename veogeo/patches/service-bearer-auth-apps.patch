@@ -1,0 +1,28 @@
+diff --git a/src/apps/geoserver/pom.xml b/src/apps/geoserver/pom.xml
+index 229efaf65..53fa7d553 100644
+--- a/src/apps/geoserver/pom.xml
++++ b/src/apps/geoserver/pom.xml
+@@ -32,6 +32,11 @@
+     </dependencies>
+   </dependencyManagement>
+   <dependencies>
++    <dependency>
++      <groupId>org.veogeo.geoservercloud</groupId>
++      <artifactId>veogeo-geoserver-cloud-service-bearer-auth</artifactId>
++      <version>${project.version}</version>
++    </dependency>
+     <dependency>
+       <groupId>org.geoserver.cloud</groupId>
+       <artifactId>gs-spring-configuration</artifactId>
+diff --git a/src/pom.xml b/src/pom.xml
+index 8b5c9002a..2b64191e4 100644
+--- a/src/pom.xml
++++ b/src/pom.xml
+@@ -18,6 +18,7 @@
+     <module>extensions</module>
+     <module>starters</module>
+     <module>apps</module>
++    <module>../veogeo</module>
+   </modules>
+   <properties>
+     <!-- ================================ -->
