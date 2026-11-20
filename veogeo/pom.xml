@@ -13,7 +13,7 @@
   <name>GeoServer Cloud custom overlays</name>
   <modules>
     <module>security/oidc-login</module>
-    <module>security/gateway-bearer-auth</module>
+    <module>security/service-bearer-auth</module>
     <module>gwc/multidimensional</module>
   </modules>
   <dependencyManagement>

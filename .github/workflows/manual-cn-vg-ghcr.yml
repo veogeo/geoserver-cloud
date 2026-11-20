@@ -53,7 +53,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Apply build-only ACL Data Access Rules CSP patch
+      - name: Apply build-only ACL and service Bearer patches
         shell: bash
         run: |
           set -euo pipefail
@@ -61,6 +61,10 @@ jobs:
           patch_file="$GITHUB_WORKSPACE/veogeo/patches/acl-data-rules-csp.patch"
           git -C "$geoserver_dir" apply --check "$patch_file"
           git -C "$geoserver_dir" apply "$patch_file"
+          service_patch_file="$GITHUB_WORKSPACE/veogeo/patches/service-bearer-auth-apps.patch"
+          git -C "$GITHUB_WORKSPACE" apply --check "$service_patch_file"
+          git -C "$GITHUB_WORKSPACE" apply "$service_patch_file"
+          git -C "$GITHUB_WORKSPACE" diff --check
           git -C "$geoserver_dir" diff --check
 
       - name: Run the complete build and test suite
@@ -69,15 +73,13 @@ jobs:
           REPOSITORY: ${{ steps.image-meta.outputs.repository }}
           TAG: ${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
 
-      - name: Add Veogeo overlays to WebUI, GWC, and Gateway images
+      - name: Add Veogeo overlays to WebUI and GWC images
         run: ./veogeo/build-overlays.sh
         env:
           WEBUI_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-webui:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
           WEBUI_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-webui:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
           GWC_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gwc:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
           GWC_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gwc:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
-          GATEWAY_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gateway:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
-          GATEWAY_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gateway:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
 
       - name: Push all base, infrastructure, and GeoServer images
         shell: bash

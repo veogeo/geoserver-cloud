@@ -36,7 +36,3 @@ build_module gwc/multidimensional veogeo-geoserver-cloud-gwc-multidimensional gw
   "${GWC_OVERLAY_IMAGE:-geoserver-cloud-gwc-multidimensional:local}" gwc.Dockerfile \
   "${GWC_BASE_IMAGE:-ghcr.io/veogeo/geoserver-cloud-gwc:latest}" \
   "gs-wmts-multi-dimensional"
-build_module security/gateway-bearer-auth veogeo-geoserver-cloud-gateway-bearer-auth gateway \
-  "${GATEWAY_OVERLAY_IMAGE:-geoserver-cloud-gateway-bearer:local}" gateway.Dockerfile \
-  "${GATEWAY_BASE_IMAGE:-ghcr.io/veogeo/geoserver-cloud-gateway:latest}" \
-  "spring-security-config,spring-security-core,spring-security-crypto,spring-security-web,spring-security-oauth2-core,spring-security-oauth2-resource-server,spring-security-oauth2-jose,nimbus-jose-jwt,oauth2-oidc-sdk,jcip-annotations,content-type,lang-tag,json-smart,accessors-smart,asm"

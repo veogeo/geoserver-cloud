@@ -1,2 +1,0 @@
-org.veogeo.geoservercloud.gateway.security.GatewayBearerAuthAutoConfiguration
-org.veogeo.geoservercloud.gateway.security.GatewaySecurityFallbackConfiguration
