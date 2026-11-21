@@ -24,7 +24,9 @@ public class ServiceBearerAuthConfigProperties {
     /** OIDC issuer URI; must match the token's {@code iss} claim. */
     private String issuerUri;
 
-    /** Optional internal JWKS endpoint override when the advertised endpoint is not reachable from the service network. */
+    /**
+     * Optional internal JWKS endpoint override when the advertised endpoint is not reachable from the service network.
+     */
     private String jwkSetUri;
 
     /** Required audience identifying this GeoServer Cloud API. */
