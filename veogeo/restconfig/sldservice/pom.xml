@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.veogeo.geoservercloud</groupId>
+    <artifactId>veogeo-geoserver-cloud-overlays</artifactId>
+    <version>${revision}</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+  <artifactId>veogeo-geoserver-cloud-restconfig-sldservice</artifactId>
+  <packaging>jar</packaging>
+  <description>Loads GeoServer SLDService in the GeoServer Cloud REST configuration service.</description>
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.geoserver.extension</groupId>
+      <artifactId>gs-sldservice</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+</project>
