@@ -58,9 +58,9 @@ jobs:
         run: |
           set -euo pipefail
           geoserver_dir="$GITHUB_WORKSPACE/geoserver_submodule/geoserver"
-          patch_file="$GITHUB_WORKSPACE/veogeo/patches/acl-data-rules-csp.patch"
-          git -C "$geoserver_dir" apply --check "$patch_file"
-          git -C "$geoserver_dir" apply "$patch_file"
+          acl_patch_file="$GITHUB_WORKSPACE/veogeo/patches/acl-data-rules-csp.patch"
+          git -C "$geoserver_dir" apply --check "$acl_patch_file"
+          git -C "$geoserver_dir" apply "$acl_patch_file"
           service_patch_file="$GITHUB_WORKSPACE/veogeo/patches/service-bearer-auth-apps.patch"
           git -C "$GITHUB_WORKSPACE" apply --check "$service_patch_file"
           git -C "$GITHUB_WORKSPACE" apply "$service_patch_file"
