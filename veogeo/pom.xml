@@ -15,6 +15,7 @@
     <module>security/oidc-login</module>
     <module>security/service-bearer-auth</module>
     <module>gwc/multidimensional</module>
+    <module>restconfig/sldservice</module>
   </modules>
   <dependencyManagement>
     <dependencies>
@@ -31,6 +32,11 @@
       <dependency>
         <groupId>org.geoserver.extension</groupId>
         <artifactId>gs-wmts-multi-dimensional</artifactId>
+        <version>${gs.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.geoserver.extension</groupId>
+        <artifactId>gs-sldservice</artifactId>
         <version>${gs.version}</version>
       </dependency>
       <dependency>

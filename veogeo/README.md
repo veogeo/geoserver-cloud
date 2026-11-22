@@ -7,8 +7,9 @@ This directory contains Veogeo-owned extensions for GeoServer Cloud. Java source
 - `security/oidc-login`: generic OpenID Connect browser login for the GeoServer WebUI. It reads the provider's discovery document and allows discovery endpoints, endpoint overrides, claims, scopes, filter name, redirect URL, and administrator mapping to be configured through `geoserver.extension.security.oidc-login.*` properties.
 - `security/service-bearer-auth`: optional Bearer JWT validation executed inside each GeoServer application. It has no provider-specific default role-claim path; `groups` is the default and claim mappings are configurable.
 - `gwc/multidimensional`: registers the WMTS multidimensional operations when GWC is enabled.
+- `restconfig/sldservice`: registers GeoServer's existing SLDService plugin in the REST configuration service. It contains only GeoServer Cloud integration.
 
-Each module declares its own Spring Boot `AutoConfiguration.imports` resource. The Bearer validator is a normal Maven dependency of WFS, WMS, WCS, WPS, GWC, REST and WebUI; it is packaged inside each executable service JAR. It does not rely on a gateway, proxy, or runtime-added JAR.
+The authentication overlays declare Spring Boot `AutoConfiguration.imports` resources. The SLDService configuration is component-scanned by the REST configuration application. The Bearer validator is a normal Maven dependency of WFS, WMS, WCS, WPS, GWC, REST and WebUI; it is packaged inside each executable service JAR. It does not rely on a gateway, proxy, or runtime-added JAR.
 
 ## Build and deploy
 
@@ -20,7 +21,7 @@ The VeoGeo modules inherit dependency versions from `../src/pom.xml`. The `manua
 
 The script builds two thin images over the configured GHCR images: `geoserver-cloud-webui-oidc:local` and `geoserver-cloud-gwc-multidimensional:local`. It does not build a gateway Bearer image.
 
-The script stages dependency JARs and Docker build contexts under `veogeo/target/image-contexts/`; it does not write generated JARs beside the maintained source or Dockerfiles. To edit an overlay, change its files under `veogeo/<area>/<name>/src/`; to rebuild the WebUI and GWC overlays, run the script above. The service Bearer code is included whenever service applications are built.
+The scripts stage dependency JARs and Docker build contexts under `veogeo/target/`; they do not write generated JARs beside maintained source or Dockerfiles. To edit an overlay, change its files under `veogeo/<area>/<name>/src/`. Run `./veogeo/build-sldservice-libs.sh` to build the SLDService libraries for a local runtime mount. The service Bearer code is included whenever service applications are built.
 
 For a different identity provider, configure the generic OIDC properties. At minimum set `GEOSERVER_EXTENSION_SECURITY_OIDC_LOGIN_ENABLED=true`, `..._CLIENT_ID`, `..._CLIENT_SECRET`, and `..._ISSUER_URI`; set `..._DISCOVERY_URI` only when the provider does not use the standard discovery path derived from its issuer. Configure endpoint overrides only when provider metadata advertises URLs that are unreachable from the service network.
 
