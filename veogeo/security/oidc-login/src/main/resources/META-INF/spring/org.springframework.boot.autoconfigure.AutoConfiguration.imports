@@ -1,2 +1,3 @@
 org.veogeo.geoservercloud.oidc.OidcLoginInitializer
 org.veogeo.geoservercloud.oidc.OidcSecurityConfiguration
+org.veogeo.geoservercloud.oidc.OidcCoreCompatibilityConfiguration

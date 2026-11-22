@@ -73,13 +73,24 @@ jobs:
           REPOSITORY: ${{ steps.image-meta.outputs.repository }}
           TAG: ${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
 
-      - name: Add Veogeo overlays to WebUI and GWC images
+      - name: Add OIDC security support and multidimensional overlay to service images
         run: ./veogeo/build-overlays.sh
         env:
           WEBUI_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-webui:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
           WEBUI_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-webui:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          REST_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-rest:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          REST_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-rest:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WFS_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wfs:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WFS_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wfs:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WMS_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wms:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WMS_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wms:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WCS_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wcs:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WCS_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wcs:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WPS_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wps:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WPS_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wps:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
           GWC_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gwc:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
           GWC_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gwc:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          GWC_MULTIDIM_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gwc:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}-multidim
 
       - name: Push all base, infrastructure, and GeoServer images
         shell: bash
