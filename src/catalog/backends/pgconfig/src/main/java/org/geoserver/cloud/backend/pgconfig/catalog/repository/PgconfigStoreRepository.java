@@ -5,6 +5,7 @@
 
 package org.geoserver.cloud.backend.pgconfig.catalog.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 import lombok.NonNull;
@@ -12,6 +13,9 @@ import org.geoserver.catalog.DataStoreInfo;
 import org.geoserver.catalog.StoreInfo;
 import org.geoserver.catalog.WorkspaceInfo;
 import org.geoserver.catalog.plugin.CatalogInfoRepository.StoreRepository;
+import org.geoserver.cloud.backend.pgconfig.cache.CacheKey;
+import org.geoserver.cloud.backend.pgconfig.cache.CatalogInfoKeys;
+import org.geoserver.cloud.backend.pgconfig.catalog.secrets.StoreSecrets;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** @since 1.4 */
@@ -27,26 +31,29 @@ public class PgconfigStoreRepository extends PgconfigCatalogInfoRepository<Store
         return "storeinfos";
     }
 
+    /** Writes the secrets of the store encrypted, see {@link StoreSecrets#encrypt(StoreInfo)}. */
+    @Override
+    protected String encode(StoreInfo info) {
+        return storeSecrets().encrypt(info);
+    }
+
     @Override
     protected String getReturnColumns() {
         return CatalogInfoRowMapper.STOREINFO_BUILD_COLUMNS;
     }
 
     @Override
-    public <U extends StoreInfo> Optional<U> findById(@NonNull String id, Class<U> clazz) {
-        return findOne(select("WHERE id = ?"), clazz, id);
-    }
-
-    @Override
     public void setDefaultDataStore(@NonNull WorkspaceInfo workspace, @NonNull DataStoreInfo dataStore) {
         String sql = "UPDATE workspaceinfo SET default_store = ? WHERE id = ?";
         template.update(sql, dataStore.getId(), workspace.getId());
+        evictAfterWrite(CatalogInfoKeys.defaultDataStore(workspace.getId()));
     }
 
     @Override
     public void unsetDefaultDataStore(@NonNull WorkspaceInfo workspace) {
         String sql = "UPDATE workspaceinfo SET default_store = NULL WHERE id = ?";
         template.update(sql, workspace.getId());
+        evictAfterWrite(CatalogInfoKeys.defaultDataStore(workspace.getId()));
     }
 
     @Override
@@ -55,17 +62,17 @@ public class PgconfigStoreRepository extends PgconfigCatalogInfoRepository<Store
                 """
                 WHERE id = (SELECT default_store FROM workspaceinfo WHERE id = ?)
                 """);
-        return findOne(sql, DataStoreInfo.class, workspace.getId());
+        List<CacheKey> keys = List.of(CatalogInfoKeys.defaultDataStore(workspace.getId()));
+        return findByKeys(keys, DataStoreInfo.class, () -> findOne(sql, DataStoreInfo.class, workspace.getId()));
     }
 
+    // A store is listed as the default of its own workspace only: callers pair each listed store with its workspace
     @Override
     public Stream<DataStoreInfo> getDefaultDataStores() {
-        String sql =
+        String sql = select(
                 """
-                SELECT s.store, s.workspace \
-                FROM storeinfos s \
-                INNER JOIN workspaceinfo w ON s."workspace.id" = w.id AND s.id = w.default_store;
-                """;
+                WHERE id IN (SELECT default_store FROM workspaceinfo w WHERE w.id = storeinfos."workspace.id")
+                """);
         return super.queryForStream(DataStoreInfo.class, sql);
     }
 
@@ -102,12 +109,10 @@ public class PgconfigStoreRepository extends PgconfigCatalogInfoRepository<Store
     public <T extends StoreInfo> Optional<T> findByNameAndWorkspace(
             @NonNull String name, @NonNull WorkspaceInfo workspace, @NonNull Class<T> clazz) {
 
-        return findOne(
-                select("""
+        String query = select("""
                 WHERE "workspace.id" = ? AND name = ?
-                """),
-                clazz,
-                workspace.getId(),
-                name);
+                """);
+        List<CacheKey> keys = nameKeys(CatalogInfoKeys.prefixedName(workspace, name), clazz);
+        return findByKeys(keys, clazz, () -> findOne(query, clazz, workspace.getId(), name));
     }
 }

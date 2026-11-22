@@ -23,7 +23,7 @@
     </dependency>
     <dependency>
       <groupId>org.geoserver.cloud.catalog</groupId>
-      <artifactId>gs-cloud-events</artifactId>
+      <artifactId>gs-cloud-catalog-event-bus</artifactId>
     </dependency>
     <dependency>
       <groupId>org.geoserver.cloud.gwc</groupId>
@@ -42,6 +42,16 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-aspectj</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-cache</artifactId>
+    </dependency>
+    <dependency>
+      <!-- the metrics of the built tile layers, registered when Micrometer is available -->
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
