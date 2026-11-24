@@ -53,14 +53,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Apply build-only ACL Data Access Rules CSP patch
+      - name: Apply build-only ACL version, CSP, and service Bearer patches
         shell: bash
         run: |
           set -euo pipefail
           geoserver_dir="$GITHUB_WORKSPACE/geoserver_submodule/geoserver"
-          patch_file="$GITHUB_WORKSPACE/build-patches/acl-data-rules-csp.patch"
-          git -C "$geoserver_dir" apply --check "$patch_file"
-          git -C "$geoserver_dir" apply "$patch_file"
+          acl_patch_file="$GITHUB_WORKSPACE/veogeo/patches/acl-data-rules-csp.patch"
+          git -C "$geoserver_dir" apply --check "$acl_patch_file"
+          git -C "$geoserver_dir" apply "$acl_patch_file"
+          acl_version_patch_file="$GITHUB_WORKSPACE/veogeo/patches/acl-version-3.0.5.patch"
+          git -C "$geoserver_dir" apply --check "$acl_version_patch_file"
+          git -C "$geoserver_dir" apply "$acl_version_patch_file"
+          service_patch_file="$GITHUB_WORKSPACE/veogeo/patches/service-bearer-auth-apps.patch"
+          git -C "$GITHUB_WORKSPACE" apply --check "$service_patch_file"
+          git -C "$GITHUB_WORKSPACE" apply "$service_patch_file"
+          git -C "$GITHUB_WORKSPACE" diff --check
           git -C "$geoserver_dir" diff --check
 
       - name: Run the complete build and test suite
@@ -68,6 +75,25 @@ jobs:
         env:
           REPOSITORY: ${{ steps.image-meta.outputs.repository }}
           TAG: ${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+
+      - name: Add OIDC security support and multidimensional overlay to service images
+        run: ./veogeo/build-overlays.sh
+        env:
+          WEBUI_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-webui:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WEBUI_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-webui:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          REST_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-rest:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          REST_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-rest:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WFS_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wfs:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WFS_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wfs:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WMS_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wms:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WMS_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wms:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WCS_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wcs:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WCS_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wcs:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WPS_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wps:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          WPS_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-wps:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          GWC_BASE_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gwc:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          GWC_OVERLAY_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gwc:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
+          GWC_MULTIDIM_IMAGE: ${{ steps.image-meta.outputs.repository }}/geoserver-cloud-gwc:${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}-multidim
 
       - name: Push all base, infrastructure, and GeoServer images
         shell: bash
