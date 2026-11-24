@@ -53,7 +53,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Apply build-only ACL and service Bearer patches
+      - name: Apply build-only ACL version, CSP, and service Bearer patches
         shell: bash
         run: |
           set -euo pipefail
@@ -61,6 +61,9 @@ jobs:
           acl_patch_file="$GITHUB_WORKSPACE/veogeo/patches/acl-data-rules-csp.patch"
           git -C "$geoserver_dir" apply --check "$acl_patch_file"
           git -C "$geoserver_dir" apply "$acl_patch_file"
+          acl_version_patch_file="$GITHUB_WORKSPACE/veogeo/patches/acl-version-3.0.5.patch"
+          git -C "$geoserver_dir" apply --check "$acl_version_patch_file"
+          git -C "$geoserver_dir" apply "$acl_version_patch_file"
           service_patch_file="$GITHUB_WORKSPACE/veogeo/patches/service-bearer-auth-apps.patch"
           git -C "$GITHUB_WORKSPACE" apply --check "$service_patch_file"
           git -C "$GITHUB_WORKSPACE" apply "$service_patch_file"
