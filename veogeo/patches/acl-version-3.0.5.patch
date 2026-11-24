@@ -1,0 +1,12 @@
+diff --git a/src/community/acl/pom.xml b/src/community/acl/pom.xml
+--- a/src/community/acl/pom.xml
++++ b/src/community/acl/pom.xml
+@@ -18,7 +18,7 @@
+     <module>plugin</module>
+     <module>assembly</module>
+   </modules>
+   <properties>
+-    <geoserver-acl.version>3.0.4</geoserver-acl.version>
++    <geoserver-acl.version>3.0.5</geoserver-acl.version>
+     <lombok.version>1.18.46</lombok.version>
+   </properties>
