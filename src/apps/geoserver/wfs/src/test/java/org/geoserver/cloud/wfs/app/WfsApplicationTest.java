@@ -38,6 +38,12 @@ abstract class WfsApplicationTest {
     @Autowired
     protected ApplicationContext context;
 
+    @Test
+    void pubsubAutoConfigurationIsDisabledWithoutItsBusProfile() {
+        assertThat(context.getEnvironment().getProperty("spring.cloud.gcp.pubsub.enabled", Boolean.class))
+                .isFalse();
+    }
+
     @Autowired
     @Qualifier("rawCatalog")
     private Catalog catalog;

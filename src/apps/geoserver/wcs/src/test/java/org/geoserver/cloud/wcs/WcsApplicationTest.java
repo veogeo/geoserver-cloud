@@ -24,6 +24,12 @@ import org.springframework.test.context.DynamicPropertySource;
 class WcsApplicationTest {
     protected @Autowired ConfigurableApplicationContext context;
 
+    @Test
+    void pubsubAutoConfigurationIsDisabledWithoutItsBusProfile() {
+        assertThat(context.getEnvironment().getProperty("spring.cloud.gcp.pubsub.enabled", Boolean.class))
+                .isFalse();
+    }
+
     static @TempDir Path datadir;
 
     @DynamicPropertySource

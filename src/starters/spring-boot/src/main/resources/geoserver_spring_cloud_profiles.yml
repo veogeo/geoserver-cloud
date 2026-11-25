@@ -1,4 +1,9 @@
 spring:
+  cloud:
+    gcp:
+      pubsub:
+        # The Pub/Sub client is optional; activate it only with the bus-pubsub profile.
+        enabled: false
   profiles:
     include: default
     group:
@@ -63,6 +68,9 @@ spring.config.activate.on-profile: "bus-pubsub"
 
 spring:
   cloud:
+    gcp:
+      pubsub:
+        enabled: true
     bus:
       enabled: true
       id: ${info.instance-id}
