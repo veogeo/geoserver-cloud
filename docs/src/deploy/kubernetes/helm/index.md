@@ -43,13 +43,13 @@ geoservercloud:
 - **Pinned versions.** Your `Chart.lock` captures exact versions of the app chart and its infra deps so installs are reproducible.
 - **A values overlay you own.** You never have to edit upstream files — your `values.yaml` is the only knob you operate, and it lives in your Git history.
 - **Room for your own resources.** Put ConfigMaps, Secrets, Jobs, and NetworkPolicies under your chart's `templates/` directory. The bundled example uses this to ship a `ConfigMap` that installs the PostGIS extension at first Postgres startup.
-- **Co-located infra deps.** Add RabbitMQ, PostgreSQL, or anything else your deployment needs as additional `dependencies:` entries, so `helm upgrade --install` brings the whole stack up together.
+- **Co-located infra deps.** Add RabbitMQ when selecting the `bus-rabbitmq` profile, PostgreSQL, or anything else your deployment needs as additional `dependencies:` entries, so `helm upgrade --install` brings the whole stack up together.
 
-## PostgreSQL and RabbitMQ images: use the `bitnamilegacy` mirror
+## PostgreSQL and optional RabbitMQ images: use the `bitnamilegacy` mirror
 
 !!! warning "Bitnami image availability"
 
-    Bitnami's official container images are no longer freely redistributable. The examples on this site pull the chart from GeOrchestra's OCI mirror (`oci://ghcr.io/georchestra/bitnami-helm-charts`) **and** override the image to point at `docker.io/bitnamilegacy/postgresql` and `docker.io/bitnamilegacy/rabbitmq`, which remain publicly pullable. If you omit these overrides you will see `ImagePullBackOff` on the `postgresql` and `rabbitmq` pods.
+    Bitnami's official container images are no longer freely redistributable. The examples on this site pull the chart from GeOrchestra's OCI mirror (`oci://ghcr.io/georchestra/bitnami-helm-charts`) **and** override the image to point at `docker.io/bitnamilegacy/postgresql` and `docker.io/bitnamilegacy/rabbitmq`, which remain publicly pullable. RabbitMQ is disabled in the default Pub/Sub values; if you enable RabbitMQ, keep its image override to avoid `ImagePullBackOff`.
 
 Minimal override in `values.yaml`:
 
@@ -81,3 +81,8 @@ Because the same `env`, `volumes`, and `volumeMounts` blocks usually apply to ev
 
 - **[Example — pgconfig](./example-pgconfig.md)** — the walkthrough for the chart bundled with these docs. Start here.
 - **Upstream [`examples/`](https://github.com/camptocamp/helm-geoserver-cloud/tree/master/examples) directory** — additional patterns: `datadir` (shared filesystem), `gwcStatefulSet` (dedicated tile cache), `pgconfig-acl` (with the Access Control List service), `pgconfig-wms-hpa` (horizontal pod autoscaler for WMS).
+
+The bundled values select bus-pubsub through the kubernetes profile group. The workload needs Google Cloud
+Application Default Credentials and permission to create the Pub/Sub topic and per-instance subscriptions. To use
+RabbitMQ instead, enable the optional rabbitmq chart dependency, configure RABBITMQ_* values, and activate the
+bus-rabbitmq profile (for example through standalone).

@@ -30,9 +30,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.cloud.bus.ServiceMatcher;
 import org.springframework.cloud.bus.event.Destination;
 import org.springframework.cloud.bus.jackson.RemoteApplicationEventScan;
+import org.springframework.cloud.stream.binder.BindingCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -134,6 +136,19 @@ public class RemoteGeoServerEventsConfiguration {
         @Bean
         RemoteEventsResumedPublisher remoteEventsResumedPublisher(ApplicationEventPublisher eventPublisher) {
             return new RemoteEventsResumedPublisher(eventPublisher);
+        }
+    }
+
+    /** Publishes {@link RemoteEventsResumed} once the Pub/Sub bus input binding is active. */
+    @Configuration(proxyBeanMethods = false)
+    @Profile("bus-pubsub")
+    @ConditionalOnClass(BindingCreatedEvent.class)
+    static class PubSubResumedEventsConfiguration {
+
+        @Bean
+        StreamRemoteEventsResumedPublisher streamRemoteEventsResumedPublisher(
+                ApplicationEventPublisher eventPublisher) {
+            return new StreamRemoteEventsResumedPublisher(eventPublisher);
         }
     }
 }

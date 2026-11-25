@@ -1,6 +1,11 @@
 # Example — pgconfig
 
-This example deploys GeoServer Cloud with the `pgconfig` catalog backend (PostgreSQL) and the `standalone` Spring profile (no Consul/Config Server — services discover each other via Kubernetes DNS). The Helm chart in this directory is a minimal wrapper that depends on the upstream `camptocamp/helm-geoserver-cloud` chart plus PostgreSQL and RabbitMQ.
+This example deploys GeoServer Cloud with the `pgconfig` catalog backend (PostgreSQL) and the `kubernetes` Spring profile (no Consul/Config Server — services discover each other via Kubernetes DNS). The event bus uses Google Cloud Pub/Sub by default. The Helm chart in this directory is a minimal wrapper that depends on the upstream `camptocamp/helm-geoserver-cloud` chart, PostgreSQL, and an optional RabbitMQ chart. Configure Workload Identity or Application Default Credentials with Pub/Sub access before installing it.
+
+To use RabbitMQ instead, enable `rabbitmq.enabled`, change both `geoservercloud.global.profile` and the shared
+`SPRING_PROFILES_ACTIVE` value from `kubernetes,pgconfig` to `standalone,pgconfig`, and configure
+`RABBITMQ_HOST=gs-cloud-pgconfig-rabbitmq` plus the username/password from the RabbitMQ chart secret. This disables
+the Pub/Sub profile for the example.
 
 !!! tip "New to Kubernetes?"
     Before starting, make sure you have a local cluster with an ingress controller and a `gscloud.localhost` DNS alias. See [Prerequisites](../prerequisites.md).
@@ -54,7 +59,7 @@ Then verify:
 kubectl get pods
 ```
 
-Expected: 10 pods, all `Running` with `1/1` under `READY`:
+Expected: 9 pods, all `Running` with `1/1` under `READY`:
 
 ```text
 NAME                                             READY   STATUS    RESTARTS   AGE
@@ -67,7 +72,6 @@ gs-cloud-pgconfig-gsc-wfs-…                      1/1     Running   0          
 gs-cloud-pgconfig-gsc-wms-…                      1/1     Running   0          1m
 gs-cloud-pgconfig-gsc-wps-…                      1/1     Running   0          1m
 gs-cloud-pgconfig-postgresql-0                   1/1     Running   0          1m
-gs-cloud-pgconfig-rabbitmq-0                     1/1     Running   0          1m
 ```
 
 ## 4. Confirm the DNS alias
@@ -92,17 +96,13 @@ To also remove the cluster, see the teardown step in [Prerequisites](../prerequi
 
 ## Troubleshooting
 
-??? failure "RabbitMQ `Connection refused` in early logs"
-    GeoServer Cloud services start in parallel with RabbitMQ. For the first ~30 seconds you'll see log lines like:
+??? failure "Pub/Sub permission errors"
+    The workload identity must be able to publish to the geoserver topic and create/delete its per-instance
+    subscriptions. Verify the Kubernetes service account's Google Cloud identity and IAM grants.
 
-    ```text
-    AmqpConnectException: java.net.ConnectException: Connection refused
-    ```
-
-    The services retry automatically. If the message persists after a minute, check that `gs-cloud-pgconfig-rabbitmq-0` is `1/1 Running`.
-
-??? failure "`ImagePullBackOff` on `postgresql` or `rabbitmq` pods"
-    Bitnami's official images are no longer freely pullable. This example overrides both charts to use `docker.io/bitnamilegacy/*` in `values.yaml`. Check that those overrides are present:
+??? failure "`ImagePullBackOff` on the PostgreSQL pod"
+    Bitnami's official images are no longer freely pullable. This example overrides the chart to use
+    `docker.io/bitnamilegacy/postgresql` in `values.yaml`. Check that the override is present:
 
     ```bash
     grep -A1 bitnamilegacy values.yaml
