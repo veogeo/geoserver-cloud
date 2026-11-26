@@ -101,9 +101,34 @@ jobs:
           REPOSITORY: ${{ steps.image-meta.outputs.repository }}
           TAG: ${{ steps.image-meta.outputs.tag }}-${{ matrix.arch }}
         run: |
-          docker compose -f docker-build/base-images.yml push
-          docker compose -f docker-build/infrastructure.yml push
-          docker compose -f docker-build/geoserver.yml push
+          set -euo pipefail
+
+          push_with_retry() {
+            local compose_file="$1"
+            shift
+            local attempt=1
+
+            while true; do
+              if docker compose --parallel 1 -f "$compose_file" push "$@"; then
+                return 0
+              fi
+              if (( attempt >= 3 )); then
+                echo "GHCR push failed after ${attempt} attempts: ${compose_file} $*" >&2
+                return 1
+              fi
+              local delay=$((attempt * 10))
+              echo "GHCR push failed (attempt ${attempt}/3); retrying ${compose_file} $* in ${delay}s" >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+            done
+          }
+
+          # Publish in dependency order so GHCR can mount shared layers from completed base images.
+          push_with_retry docker-build/base-images.yml jre
+          push_with_retry docker-build/base-images.yml spring-boot
+          push_with_retry docker-build/base-images.yml geoserver-common
+          push_with_retry docker-build/infrastructure.yml
+          push_with_retry docker-build/geoserver.yml
 
   publish-multiarch-manifests:
     if: github.ref == 'refs/heads/cn-vg'
