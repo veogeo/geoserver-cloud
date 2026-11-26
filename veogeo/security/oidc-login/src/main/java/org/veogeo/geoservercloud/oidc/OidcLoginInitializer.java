@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.geoserver.platform.resource.Resource.Lock;
@@ -42,37 +43,132 @@ public class OidcLoginInitializer {
 
     static final String PREFIX = "geoserver.extension.security.oidc-login";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final long DEFAULT_DISCOVERY_CONNECT_TIMEOUT_SECONDS = 5;
+    private static final long DEFAULT_DISCOVERY_READ_TIMEOUT_SECONDS = 30;
+    private static final int DEFAULT_DISCOVERY_MAX_ATTEMPTS = 6;
+    private static final long DEFAULT_DISCOVERY_RETRY_DELAY_SECONDS = 5;
+    private static final long DEFAULT_DISCOVERY_MAX_RETRY_DELAY_SECONDS = 60;
 
     private final GeoServerSecurityManager securityManager;
     private final Environment environment;
+    private final AtomicBoolean initializationStarted = new AtomicBoolean();
 
     @EventListener(ApplicationReadyEvent.class)
     public void configureOidcLogin() {
-        String filterName = property("filter-name", "oidc");
-        String clientId = required("client-id");
-        String clientSecret = required("client-secret");
-        String issuerUri = required("issuer-uri");
-        String discoveryUri =
-                property("discovery-uri", trimTrailingSlash(issuerUri) + "/.well-known/openid-configuration");
+        if (!initializationStarted.compareAndSet(false, true)) return;
 
-        Lock lock = securityManager.security().lock();
+        // The discovery request both wakes a cold IdP and obtains its metadata. Run it away from
+        // the application-ready thread so an unavailable or slow provider cannot fail GeoServer startup.
+        Thread initializer = new Thread(this::configureOidcLoginBestEffort, "geoserver-oidc-login-initializer");
+        initializer.setDaemon(true);
+        initializer.start();
+        log.info("Started best-effort asynchronous OIDC discovery for browser login.");
+    }
+
+    private void configureOidcLoginBestEffort() {
+        final String filterName;
+        final String clientId;
+        final String clientSecret;
+        final String issuerUri;
+        final String discoveryUri;
         try {
-            SecurityFilterConfig existingConfig = securityManager.loadFilterConfig(filterName, false);
-            if (existingConfig != null && !(existingConfig instanceof GeoServerOAuth2LoginFilterConfig)) {
-                throw new IllegalStateException(
-                        "A non-OIDC security filter named '" + filterName + "' already exists.");
-            }
-            GeoServerOAuth2LoginFilterConfig filterConfig = createFilterConfig(
-                    filterName, clientId, clientSecret, issuerUri, discoveryUri, (GeoServerOAuth2LoginFilterConfig)
-                            existingConfig);
-            securityManager.saveFilter(filterConfig);
-            addFilterToWebChain(filterName);
-            log.info("Configured optional OpenID Connect login filter '{}'.", filterName);
+            filterName = property("filter-name", "oidc");
+            clientId = required("client-id");
+            clientSecret = required("client-secret");
+            issuerUri = required("issuer-uri");
+            discoveryUri =
+                    property("discovery-uri", trimTrailingSlash(issuerUri) + "/.well-known/openid-configuration");
         } catch (Exception e) {
-            throw new IllegalStateException("Could not configure the GeoServer OpenID Connect login filter.", e);
-        } finally {
-            lock.release();
+            log.error(
+                    "OIDC browser login configuration is invalid; GeoServer will continue without the login filter.",
+                    e);
+            return;
         }
+
+        int maxAttempts = Math.max(
+                1,
+                environment.getProperty(
+                        PREFIX + ".discovery-max-attempts", Integer.class, DEFAULT_DISCOVERY_MAX_ATTEMPTS));
+        Duration connectTimeout =
+                timeoutProperty("discovery-connect-timeout-seconds", DEFAULT_DISCOVERY_CONNECT_TIMEOUT_SECONDS);
+        Duration readTimeout =
+                timeoutProperty("discovery-read-timeout-seconds", DEFAULT_DISCOVERY_READ_TIMEOUT_SECONDS);
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                Map<String, Object> metadata = readProviderMetadata(discoveryUri, connectTimeout, readTimeout);
+                Lock lock = securityManager.security().lock();
+                try {
+                    SecurityFilterConfig existingConfig = securityManager.loadFilterConfig(filterName, false);
+                    if (existingConfig != null && !(existingConfig instanceof GeoServerOAuth2LoginFilterConfig)) {
+                        throw new IllegalStateException(
+                                "A non-OIDC security filter named '" + filterName + "' already exists.");
+                    }
+                    GeoServerOAuth2LoginFilterConfig filterConfig = createFilterConfig(
+                            filterName,
+                            clientId,
+                            clientSecret,
+                            issuerUri,
+                            discoveryUri,
+                            metadata,
+                            (GeoServerOAuth2LoginFilterConfig) existingConfig);
+                    securityManager.saveFilter(filterConfig);
+                    addFilterToWebChain(filterName);
+                } finally {
+                    lock.release();
+                }
+                log.info("Configured optional OpenID Connect login filter '{}' from provider metadata.", filterName);
+                return;
+            } catch (Exception e) {
+                if (attempt == maxAttempts) {
+                    log.error(
+                            "Could not configure the GeoServer OpenID Connect login filter after {} attempts. "
+                                    + "GeoServer remains available; browser OIDC login stays unavailable until a later startup attempt succeeds.",
+                            maxAttempts,
+                            e);
+                    return;
+                }
+
+                Duration delay = retryDelay(attempt);
+                log.warn(
+                        "OIDC provider discovery/configuration attempt {}/{} failed. GeoServer remains available; "
+                                + "retrying in {} seconds.",
+                        attempt,
+                        maxAttempts,
+                        delay.toSeconds(),
+                        e);
+                try {
+                    Thread.sleep(delay.toMillis());
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    log.warn("OIDC login initialization was interrupted; GeoServer remains available.");
+                    return;
+                }
+            }
+        }
+    }
+
+    private Duration timeoutProperty(String key, long defaultSeconds) {
+        long seconds = environment.getProperty(PREFIX + "." + key, Long.class, defaultSeconds);
+        return Duration.ofSeconds(Math.max(1, seconds));
+    }
+
+    private Duration retryDelay(int failedAttempt) {
+        long baseSeconds = Math.max(
+                1,
+                environment.getProperty(
+                        PREFIX + ".discovery-retry-delay-seconds", Long.class, DEFAULT_DISCOVERY_RETRY_DELAY_SECONDS));
+        long maxSeconds = Math.max(
+                1,
+                environment.getProperty(
+                        PREFIX + ".discovery-max-retry-delay-seconds",
+                        Long.class,
+                        DEFAULT_DISCOVERY_MAX_RETRY_DELAY_SECONDS));
+        long multiplier = 1L << Math.min(failedAttempt - 1, 20);
+        long delaySeconds = baseSeconds >= maxSeconds || baseSeconds > maxSeconds / multiplier
+                ? maxSeconds
+                : baseSeconds * multiplier;
+        return Duration.ofSeconds(delaySeconds);
     }
 
     private GeoServerOAuth2LoginFilterConfig createFilterConfig(
@@ -81,8 +177,8 @@ public class OidcLoginInitializer {
             String clientSecret,
             String issuerUri,
             String discoveryUri,
+            Map<String, Object> metadata,
             GeoServerOAuth2LoginFilterConfig existingConfig) {
-        Map<String, Object> metadata = readProviderMetadata(discoveryUri);
         GeoServerOAuth2LoginFilterConfig config =
                 existingConfig == null ? new GeoServerOAuth2LoginFilterConfig() : existingConfig;
 
@@ -132,11 +228,12 @@ public class OidcLoginInitializer {
         return discovered instanceof String value ? value.trim() : "";
     }
 
-    private Map<String, Object> readProviderMetadata(String discoveryUri) {
+    private Map<String, Object> readProviderMetadata(
+            String discoveryUri, Duration connectTimeout, Duration readTimeout) {
         try {
             SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-            requestFactory.setConnectTimeout(Duration.ofSeconds(5));
-            requestFactory.setReadTimeout(Duration.ofSeconds(5));
+            requestFactory.setConnectTimeout(connectTimeout);
+            requestFactory.setReadTimeout(readTimeout);
             String body = new RestTemplate(requestFactory).getForObject(discoveryUri, String.class);
             if (!StringUtils.hasText(body)) {
                 throw new IllegalStateException("OIDC discovery document is empty at " + discoveryUri + ".");
