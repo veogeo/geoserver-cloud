@@ -15,13 +15,19 @@ Uso:
 
 Opciones:
   --images ghcr|build       Descargar imágenes publicadas o construir desde este repo (default: ghcr)
-  --tag TAG                 Tag GHCR; en modo build el tag local es 3.1.0-SNAPSHOT
+  --tag TAG                 Tag GHCR (default: latest)
   --postgres local|external PostgreSQL en este Compose o existente (default: local)
   --pg-host HOST            Host obligatorio con --postgres external
   --pg-port PORT            Puerto PostgreSQL (default: 5432)
   --pg-database NAME        Base de catálogo y ACL (default: geoserver)
   --pg-user USER            Usuario de PostgreSQL (default: geoserver)
   PGCONFIG_PASSWORD=...     Contraseña de PostgreSQL externo; si falta, se solicita sin mostrarla
+  --oidc                    Activar login OIDC en GeoServer WebUI
+  --oidc-issuer URL         Issuer del proveedor OIDC (requerido con --oidc)
+  --oidc-client-id ID       Client ID (requerido con --oidc)
+  OIDC_CLIENT_SECRET=...    Client secret; si falta, se solicita sin mostrarlo
+  --oidc-public-url URL     Origen público, p. ej. https://maps.example.org (requerido con --oidc)
+  --oidc-discovery-url URL  URL discovery opcional; por defecto issuer/.well-known/openid-configuration
   --nginx included|external|none
                             Nginx en este Compose, en otro Compose o sin Nginx (default: included)
   --project NAME            Nombre del proyecto Compose (default: veogeo-geoserver-cloud)
@@ -42,6 +48,11 @@ pg_user=geoserver
 nginx=included
 project=veogeo-geoserver-cloud
 action=deploy
+oidc=false
+oidc_issuer=
+oidc_client_id=
+oidc_public_url=
+oidc_discovery_url=
 
 while (($#)); do
   case "$1" in
@@ -52,6 +63,11 @@ while (($#)); do
     --pg-port) pg_port="${2:?falta valor para --pg-port}"; shift 2 ;;
     --pg-database) pg_database="${2:?falta valor para --pg-database}"; shift 2 ;;
     --pg-user) pg_user="${2:?falta valor para --pg-user}"; shift 2 ;;
+    --oidc) oidc=true; shift ;;
+    --oidc-issuer) oidc_issuer="${2:?falta valor para --oidc-issuer}"; shift 2 ;;
+    --oidc-client-id) oidc_client_id="${2:?falta valor para --oidc-client-id}"; shift 2 ;;
+    --oidc-public-url) oidc_public_url="${2:?falta valor para --oidc-public-url}"; shift 2 ;;
+    --oidc-discovery-url) oidc_discovery_url="${2:?falta valor para --oidc-discovery-url}"; shift 2 ;;
     --nginx) nginx="${2:?falta valor para --nginx}"; shift 2 ;;
     --project) project="${2:?falta valor para --project}"; shift 2 ;;
     --stop) action=stop; shift ;;
@@ -77,6 +93,11 @@ case "$nginx" in included|external|none) ;; *) echo "--nginx debe ser included, 
 if [[ "$postgres" == external && -z "$pg_host" ]]; then
   echo "Con --postgres external especifica --pg-host." >&2; exit 2
 fi
+if [[ "$oidc" == true ]]; then
+  [[ -n "$oidc_issuer" ]] || { echo "Con --oidc especifica --oidc-issuer." >&2; exit 2; }
+  [[ -n "$oidc_client_id" ]] || { echo "Con --oidc especifica --oidc-client-id." >&2; exit 2; }
+  [[ -n "$oidc_public_url" ]] || { echo "Con --oidc especifica --oidc-public-url." >&2; exit 2; }
+fi
 if [[ -e "$ENV_FILE" ]]; then
   echo "$ENV_FILE ya existe. Consérvalo para mantener credenciales; bórralo solo si vas a configurar una instalación nueva." >&2
   exit 1
@@ -94,6 +115,12 @@ fi
 rabbit_password="$(secret)"
 acl_admin_password="$(secret)"
 acl_geoserver_password="$(secret)"
+oidc_client_secret="${OIDC_CLIENT_SECRET:-}"
+if [[ "$oidc" == true && -z "$oidc_client_secret" ]]; then
+  read -r -s -p "Client secret del proveedor OIDC: " oidc_client_secret
+  printf '\n'
+  [[ -n "$oidc_client_secret" ]] || { echo "El client secret OIDC no puede estar vacío." >&2; exit 2; }
+fi
 uid="$(id -u)"
 gid="$(id -g)"
 profiles=
@@ -106,9 +133,45 @@ if [[ "$postgres" == local ]]; then pg_host=geoserverdb; fi
 if [[ "$images" == ghcr ]]; then
   image_prefix=ghcr.io/veogeo
   image_tag="$tag"
+  config_image="$image_prefix/geoserver-cloud-config:$image_tag"
+  gateway_image="$image_prefix/geoserver-cloud-gateway:$image_tag"
+  webui_image="$image_prefix/geoserver-cloud-webui:$image_tag"
+  rest_image="$image_prefix/geoserver-cloud-rest:$image_tag"
+  wfs_image="$image_prefix/geoserver-cloud-wfs:$image_tag"
+  wms_image="$image_prefix/geoserver-cloud-wms:$image_tag"
+  wcs_image="$image_prefix/geoserver-cloud-wcs:$image_tag"
+  wps_image="$image_prefix/geoserver-cloud-wps:$image_tag"
+  gwc_image="$image_prefix/geoserver-cloud-gwc:$image_tag"
 else
   image_prefix=geoservercloud
   image_tag="$(cd "$REPO_ROOT" && ./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)"
+  config_image="$image_prefix/geoserver-cloud-config:$image_tag"
+  gateway_image="$image_prefix/geoserver-cloud-gateway:$image_tag"
+  webui_image="$image_prefix/geoserver-cloud-webui:$image_tag"
+  rest_image="$image_prefix/geoserver-cloud-rest:$image_tag"
+  wfs_image="$image_prefix/geoserver-cloud-wfs:$image_tag"
+  wms_image="$image_prefix/geoserver-cloud-wms:$image_tag"
+  wcs_image="$image_prefix/geoserver-cloud-wcs:$image_tag"
+  wps_image="$image_prefix/geoserver-cloud-wps:$image_tag"
+  gwc_image="$image_prefix/geoserver-cloud-gwc:$image_tag"
+  if [[ "$oidc" == true ]]; then
+    webui_image=geoserver-cloud-webui-oidc:local
+    rest_image=geoserver-cloud-rest-oidc:local
+    wfs_image=geoserver-cloud-wfs-oidc:local
+    wms_image=geoserver-cloud-wms-oidc:local
+    wcs_image=geoserver-cloud-wcs-oidc:local
+    wps_image=geoserver-cloud-wps-oidc:local
+    gwc_image=geoserver-cloud-gwc-oidc:local
+  fi
+fi
+
+oidc_enabled=false
+oidc_post_logout_redirect_uri=
+oidc_effective_discovery_url=
+if [[ "$oidc" == true ]]; then
+  oidc_enabled=true
+  oidc_effective_discovery_url="${oidc_discovery_url:-${oidc_issuer%/}/.well-known/openid-configuration}"
+  oidc_post_logout_redirect_uri="${oidc_public_url%/}/geoserver/web/"
 fi
 
 umask 077
@@ -117,6 +180,15 @@ COMPOSE_PROJECT_NAME=$project
 COMPOSE_PROFILES=$profiles
 GSC_IMAGE_PREFIX=$image_prefix
 GSC_TAG=$image_tag
+CONFIG_IMAGE=$config_image
+GATEWAY_IMAGE=$gateway_image
+WEBUI_IMAGE=$webui_image
+REST_IMAGE=$rest_image
+WFS_IMAGE=$wfs_image
+WMS_IMAGE=$wms_image
+WCS_IMAGE=$wcs_image
+WPS_IMAGE=$wps_image
+GWC_IMAGE=$gwc_image
 GSC_UID=$uid
 GSC_GID=$gid
 PGCONFIG_HOST=$pg_host
@@ -130,6 +202,13 @@ ACL_ADMIN_PASSWORD=$acl_admin_password
 ACL_GEOSERVER_PASSWORD=$acl_geoserver_password
 GATEWAY_BIND=$gateway_bind
 GATEWAY_PORT=8080
+OIDC_ENABLED=$oidc_enabled
+OIDC_ISSUER_URI=$oidc_issuer
+OIDC_CLIENT_ID=$oidc_client_id
+OIDC_CLIENT_SECRET=$oidc_client_secret
+OIDC_DISCOVERY_URI=$oidc_effective_discovery_url
+OIDC_PUBLIC_URL=$oidc_public_url
+OIDC_POST_LOGOUT_REDIRECT_URI=$oidc_post_logout_redirect_uri
 EOF
 chmod 600 "$ENV_FILE"
 
@@ -141,6 +220,20 @@ if [[ "$images" == build ]]; then
   echo "Construyendo imágenes GeoServer Cloud locales (puede tardar bastante)..."
   # Build dependencies and applications without running the test target.
   (cd "$REPO_ROOT" && make deps install build-image TAG="$image_tag")
+  if [[ "$oidc" == true ]]; then
+    echo "Construyendo las imágenes VeoGeo con soporte OIDC..."
+    (
+      cd "$REPO_ROOT"
+      WEBUI_BASE_IMAGE="geoservercloud/geoserver-cloud-webui:$image_tag" \
+      REST_BASE_IMAGE="geoservercloud/geoserver-cloud-rest:$image_tag" \
+      WFS_BASE_IMAGE="geoservercloud/geoserver-cloud-wfs:$image_tag" \
+      WMS_BASE_IMAGE="geoservercloud/geoserver-cloud-wms:$image_tag" \
+      WCS_BASE_IMAGE="geoservercloud/geoserver-cloud-wcs:$image_tag" \
+      WPS_BASE_IMAGE="geoservercloud/geoserver-cloud-wps:$image_tag" \
+      GWC_BASE_IMAGE="geoservercloud/geoserver-cloud-gwc:$image_tag" \
+      ./veogeo/build-overlays.sh
+    )
+  fi
 fi
 
 if [[ "$postgres" == local ]]; then

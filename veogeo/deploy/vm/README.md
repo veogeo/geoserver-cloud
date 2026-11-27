@@ -33,6 +33,24 @@ With no options, the script pulls the `latest` GeoServer Cloud images from GHCR,
 | `--nginx external` | Does not start Nginx here. Publishes the gateway on `127.0.0.1:8080` and connects it to a Docker network for an external proxy. |
 | `--nginx none` | Publishes the gateway directly on `0.0.0.0:8080`. |
 
+### Optional OIDC browser login
+
+The VeoGeo GHCR images already contain the OIDC login extension; it stays disabled unless you pass `--oidc`. With `--images build`, the script builds the same VeoGeo image overlays locally before starting the stack.
+
+```bash
+./deploy.sh \
+  --images ghcr \
+  --tag latest \
+  --oidc \
+  --oidc-issuer https://identity.example.org/realms/maps \
+  --oidc-client-id geoserver-vm \
+  --oidc-public-url https://maps.example.org
+```
+
+The script securely prompts for the OIDC client secret. You can provide it through `OIDC_CLIENT_SECRET` instead. `--oidc-public-url` is the public origin without `/geoserver`; the script sets the post-logout destination to `/geoserver/web/`. Configure the OIDC client in your identity provider for the GeoServer WebUI login redirect and post-logout URLs.
+
+To build the same OIDC-enabled images from this checkout, use `--images build --oidc` with the same issuer, client ID, and public URL options. Browser login is separate from Bearer JWT validation on WMS/WFS/WCS API requests; enabling `--oidc` configures the WebUI login only.
+
 ### Examples
 
 **GHCR images, local PostgreSQL, and included Nginx:**
