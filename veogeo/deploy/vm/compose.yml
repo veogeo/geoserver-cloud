@@ -83,7 +83,7 @@ services:
       retries: 10
 
   config:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-config:${GSC_TAG:-latest}
+    image: ${CONFIG_IMAGE:?run deploy.sh first}
     user: "${GSC_UID:-1000}:${GSC_GID:-1000}"
     environment:
       <<: *config-overrides
@@ -118,7 +118,7 @@ services:
     restart: unless-stopped
 
   gateway:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-gateway:${GSC_TAG:-latest}
+    image: ${GATEWAY_IMAGE:?run deploy.sh first}
     user: "${GSC_UID:-1000}:${GSC_GID:-1000}"
     environment:
       <<: *gs-env
@@ -139,7 +139,7 @@ services:
       - geowebcache_data:/data/geowebcache
 
   geoserver_template:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-webui:${GSC_TAG:-latest}
+    image: ${WEBUI_IMAGE:?run deploy.sh first}
     user: "${GSC_UID:-1000}:${GSC_GID:-1000}"
     environment:
       <<: *gs-env
@@ -152,37 +152,47 @@ services:
       replicas: 0
 
   wfs:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-wfs:${GSC_TAG:-latest}
+    image: ${WFS_IMAGE:?run deploy.sh first}
     extends: {service: geoserver_template}
     depends_on: *gs-dependencies
     deploy: {replicas: 1}
   wms:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-wms:${GSC_TAG:-latest}
+    image: ${WMS_IMAGE:?run deploy.sh first}
     extends: {service: geoserver_template}
     depends_on: *gs-dependencies
     deploy: {replicas: 1}
   wcs:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-wcs:${GSC_TAG:-latest}
+    image: ${WCS_IMAGE:?run deploy.sh first}
     extends: {service: geoserver_template}
     depends_on: *gs-dependencies
     deploy: {replicas: 1}
   wps:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-wps:${GSC_TAG:-latest}
+    image: ${WPS_IMAGE:?run deploy.sh first}
     extends: {service: geoserver_template}
     depends_on: *gs-dependencies
     deploy: {replicas: 1}
   restconfig:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-rest:${GSC_TAG:-latest}
+    image: ${REST_IMAGE:?run deploy.sh first}
     extends: {service: geoserver_template}
     depends_on: *gs-dependencies
     deploy: {replicas: 1}
   webui:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-webui:${GSC_TAG:-latest}
+    image: ${WEBUI_IMAGE:?run deploy.sh first}
     extends: {service: geoserver_template}
+    environment:
+      <<: *gs-env
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      GEOSERVER_EXTENSION_SECURITY_OIDC_LOGIN_ENABLED: ${OIDC_ENABLED:-false}
+      GEOSERVER_EXTENSION_SECURITY_OIDC_LOGIN_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      GEOSERVER_EXTENSION_SECURITY_OIDC_LOGIN_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      GEOSERVER_EXTENSION_SECURITY_OIDC_LOGIN_ISSUER_URI: ${OIDC_ISSUER_URI:-}
+      GEOSERVER_EXTENSION_SECURITY_OIDC_LOGIN_DISCOVERY_URI: ${OIDC_DISCOVERY_URI:-}
+      GEOSERVER_EXTENSION_SECURITY_OIDC_LOGIN_PUBLIC_URL: ${OIDC_PUBLIC_URL:-http://localhost}
+      GEOSERVER_EXTENSION_SECURITY_OIDC_LOGIN_POST_LOGOUT_REDIRECT_URI: ${OIDC_POST_LOGOUT_REDIRECT_URI:-}
     depends_on: *gs-dependencies
     deploy: {replicas: 1}
   gwc:
-    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-gwc:${GSC_TAG:-latest}
+    image: ${GWC_IMAGE:?run deploy.sh first}
     extends: {service: geoserver_template}
     depends_on: *gs-dependencies
     deploy: {replicas: 1}
