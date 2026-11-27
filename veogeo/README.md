@@ -13,6 +13,8 @@ The authentication overlays declare Spring Boot `AutoConfiguration.imports` reso
 
 ## Build and deploy
 
+For a VM deployment using Docker Compose, see [`deploy/vm/README.md`](deploy/vm/README.md). That stack supports published GHCR images or local source builds, local or external PostgreSQL, and an included or externally managed Nginx.
+
 The VeoGeo modules inherit dependency versions from `../src/pom.xml`. The `manual-cn-vg-ghcr` workflow applies `patches/service-bearer-auth-apps.patch` to its temporary checkout before `make`; Maven then builds the validator as part of the service reactor and packages it into every app. The patch is not committed into the upstream POM files. The corresponding GeoServer Cloud and GeoServer artifacts for the selected revision must already be available in the local Maven repository. Build the upstream base once, then run:
 
 ```sh

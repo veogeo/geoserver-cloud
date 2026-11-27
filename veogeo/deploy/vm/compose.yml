@@ -1,0 +1,200 @@
+name: ${COMPOSE_PROJECT_NAME:-veogeo-geoserver-cloud}
+
+x-gs-env: &gs-env
+  SPRING_PROFILES_INCLUDE: config-first
+  SPRING_PROFILES_ACTIVE: pgconfig,acl
+  GEOSERVER_BASE_PATH: /geoserver/
+  GEOWEBCACHE_CACHE_DIR: /data/geowebcache
+
+x-config-overrides: &config-overrides
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_ACL_URL: http://acl:8080/acl/api
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_ACL_USERNAME: admin
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_ACL_PASSWORD: ${ACL_ADMIN_PASSWORD:?run deploy.sh first}
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_HOST: ${PGCONFIG_HOST:?set PGCONFIG_HOST in .env}
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PORT: ${PGCONFIG_PORT:-5432}
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_DATABASE: ${PGCONFIG_DATABASE:-geoserver}
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_USERNAME: ${PGCONFIG_USERNAME:-geoserver}
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_PASSWORD: ${PGCONFIG_PASSWORD:?run deploy.sh first}
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_SCHEMA: pgconfig
+  SPRING_CLOUD_CONFIG_SERVER_OVERRIDES_PGCONFIG_INITIALIZE: "true"
+
+x-gs-dependencies: &gs-dependencies
+  rabbitmq:
+    condition: service_healthy
+  config:
+    condition: service_healthy
+  consul:
+    condition: service_healthy
+  acl:
+    condition: service_started
+  init-volumes:
+    condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  geowebcache_data:
+  rabbitmq_data:
+
+networks:
+  edge:
+    name: ${COMPOSE_PROJECT_NAME:-veogeo-geoserver-cloud}_edge
+
+services:
+  # Optional local PostgreSQL. deploy.sh starts this first when --postgres local is selected.
+  geoserverdb:
+    image: ${POSTGRES_IMAGE:-imresamu/postgis:17-3.5}
+    profiles: [local-postgres]
+    shm_size: 1g
+    environment:
+      POSTGRES_DB: ${PGCONFIG_DATABASE:-geoserver}
+      POSTGRES_USER: ${PGCONFIG_USERNAME:-geoserver}
+      POSTGRES_PASSWORD: ${PGCONFIG_PASSWORD:?run deploy.sh first}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-geoserver}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?run deploy.sh first}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  consul:
+    image: hashicorp/consul:1.22.5
+    command: agent -server -bootstrap-expect=1 -ui -client=0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, consul, info]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  config:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-config:${GSC_TAG:-latest}
+    user: "${GSC_UID:-1000}:${GSC_GID:-1000}"
+    environment:
+      <<: *config-overrides
+      SPRING_PROFILES_ACTIVE: native
+      SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL: ${GSC_TAG:-latest}
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8081/actuator/health]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  acl:
+    image: geoservercloud/geoserver-acl:${ACL_TAG:-3.0.5}
+    user: "${GSC_UID:-1000}:${GSC_GID:-1000}"
+    environment:
+      PG_HOST: ${PGCONFIG_HOST:?set PGCONFIG_HOST in .env}
+      PG_PORT: ${PGCONFIG_PORT:-5432}
+      PG_DB: ${PGCONFIG_DATABASE:-geoserver}
+      PG_SCHEMA: acl
+      PG_USERNAME: ${PGCONFIG_USERNAME:-geoserver}
+      PG_PASSWORD: ${PGCONFIG_PASSWORD:?run deploy.sh first}
+      ACL_USERS_ADMIN_PASSWORD: "{noop}${ACL_ADMIN_PASSWORD:?run deploy.sh first}"
+      ACL_USERS_GEOSERVER_PASSWORD: "{noop}${ACL_GEOSERVER_PASSWORD:?run deploy.sh first}"
+      GEOSERVER_BUS_ENABLED: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-geoserver}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?run deploy.sh first}
+    depends_on:
+      rabbitmq: {condition: service_healthy}
+    restart: unless-stopped
+
+  gateway:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-gateway:${GSC_TAG:-latest}
+    user: "${GSC_UID:-1000}:${GSC_GID:-1000}"
+    environment:
+      <<: *gs-env
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    depends_on:
+      config: {condition: service_healthy}
+      consul: {condition: service_healthy}
+    ports:
+      - "${GATEWAY_BIND:-127.0.0.1}:${GATEWAY_PORT:-8080}:8080"
+    networks: [default, edge]
+    restart: unless-stopped
+
+  init-volumes:
+    image: alpine:3.24.0
+    user: root
+    command: chown -R ${GSC_UID:-1000}:${GSC_GID:-1000} /data/geowebcache
+    volumes:
+      - geowebcache_data:/data/geowebcache
+
+  geoserver_template:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-webui:${GSC_TAG:-latest}
+    user: "${GSC_UID:-1000}:${GSC_GID:-1000}"
+    environment:
+      <<: *gs-env
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    volumes:
+      - geowebcache_data:/data/geowebcache
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      replicas: 0
+
+  wfs:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-wfs:${GSC_TAG:-latest}
+    extends: {service: geoserver_template}
+    depends_on: *gs-dependencies
+    deploy: {replicas: 1}
+  wms:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-wms:${GSC_TAG:-latest}
+    extends: {service: geoserver_template}
+    depends_on: *gs-dependencies
+    deploy: {replicas: 1}
+  wcs:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-wcs:${GSC_TAG:-latest}
+    extends: {service: geoserver_template}
+    depends_on: *gs-dependencies
+    deploy: {replicas: 1}
+  wps:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-wps:${GSC_TAG:-latest}
+    extends: {service: geoserver_template}
+    depends_on: *gs-dependencies
+    deploy: {replicas: 1}
+  restconfig:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-rest:${GSC_TAG:-latest}
+    extends: {service: geoserver_template}
+    depends_on: *gs-dependencies
+    deploy: {replicas: 1}
+  webui:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-webui:${GSC_TAG:-latest}
+    extends: {service: geoserver_template}
+    depends_on: *gs-dependencies
+    deploy: {replicas: 1}
+  gwc:
+    image: ${GSC_IMAGE_PREFIX:-ghcr.io/veogeo}/geoserver-cloud-gwc:${GSC_TAG:-latest}
+    extends: {service: geoserver_template}
+    depends_on: *gs-dependencies
+    deploy: {replicas: 1}
+
+  nginx:
+    image: nginx:1.29-alpine
+    profiles: [nginx]
+    ports:
+      - "${NGINX_HTTP_BIND:-0.0.0.0}:80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [edge]
+    depends_on: [gateway]
+    restart: unless-stopped
+
